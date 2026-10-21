@@ -184,6 +184,9 @@ multipart memory forms; both require an `X-CSRF-Token` header. All responses dis
 
 ## Shared memories and private photo storage
 
+For owner-only personal notes, see the separate section below; they are not shared
+memories and never enter the family activity feed.
+
 Apply migration 009 before deploying this increment. `/memories` returns the family
 album, newest first, plus the latest 100 audit events. `/memories/add`, `/edit`,
 `/remove` and `/react` accept multipart forms with a JSON `payload` field and an
@@ -220,6 +223,34 @@ and audit history for recovery/retention management; no restore screen is provid
 Love reactions are stored once per memory/user and survive refresh. Setting the
 same desired reaction twice is idempotent; changes record the actor/time. Reactions
 do not modify content creator/updater dates or cause false edit conflicts.
+
+## Private personal notes
+
+Apply migration 010. `GET /notes` returns only the active session user's notes and
+the latest 50 entries in their private note history. `POST /notes/add`, `/notes/edit`
+and `/notes/remove` require JSON and CSRF. Every SELECT, row lock and UPDATE is
+scoped to the owner ID from the authenticated session. There is no administrator
+bypass or target-user parameter. Missing/foreign note IDs return the same 404;
+valid owner requests with stale versions return 409 `note_conflict`.
+
+Title/body are required, with optional header/footer and a required civil note date
+in YYYY-MM-DD form. Limits are 120 title characters, 500 each for header/footer,
+20,000 for body and a bounded 100,000-byte JSON request. Other JSON routes retain
+their existing 8,192-byte limit. Plain text is validated as UTF-8, control characters
+are rejected and rendered as text. Civil note dates are stored separately from UTC
+created/updated timestamps. User-scoped UUID addition keys make retries idempotent.
+
+`personal_note_history` stores owner/actor ID, note ID, action, UTC time and full
+before/after data in the same transaction. This content is never written to the
+shared `activity_events` table or returned by family/admin feeds. The notes activity
+API sends only the owner's title/action/time summaries. Owner IDs also identify
+the author/editor: only that owner can write. Deletion sets deleted_at and preserves
+private history; there is no restore UI. No-op saves create no history event.
+
+Notes are database records protected by server-side ownership checks, not an
+end-to-end encrypted vault; database/server operators and backups remain within
+the hosting trust boundary. Keep backups private and exclude database files from
+Git. No sample personal notes are seeded.
 
 Passwords use Argon2id. Sessions use host-only HttpOnly, SameSite=Lax cookies,
 rotate after login and password changes, and expire after 30 minutes idle or

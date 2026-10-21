@@ -11,6 +11,7 @@ require __DIR__ . '/src/shopping.php';
 require __DIR__ . '/src/profiles.php';
 require __DIR__ . '/src/calendar.php';
 require __DIR__ . '/src/memories.php';
+require __DIR__ . '/src/notes.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -46,6 +47,8 @@ $routes = [
     '/memories' => ['GET'], '/memories/photo' => ['GET'],
     '/memories/add' => ['POST'], '/memories/edit' => ['POST'],
     '/memories/remove' => ['POST'], '/memories/react' => ['POST'],
+    '/notes' => ['GET'], '/notes/add' => ['POST'],
+    '/notes/edit' => ['POST'], '/notes/remove' => ['POST'],
 ];
 if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', $routes[$path], true)) {
@@ -72,6 +75,11 @@ if ($path === '/auth/logout') {
 }
 
 $db = connectDatabase($configuration);
+if ($path === '/notes' || str_starts_with($path, '/notes/')) {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/notes' ? personalNotesSnapshot($db, $user) : mutatePersonalNote($db, $user, substr($path, strlen('/notes/')), requestJson(100000)));
+    exit;
+}
 if ($path === '/memories' || str_starts_with($path, '/memories/')) {
     $user = requireFamilyUser($db);
     if ($path === '/memories/photo') serveMemoryPhoto($db, $configuration);

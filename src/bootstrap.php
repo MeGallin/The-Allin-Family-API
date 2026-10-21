@@ -49,13 +49,13 @@ final class HttpError extends RuntimeException
     }
 }
 
-function requestJson(): array
+function requestJson(int $maxBytes = 8192): array
 {
     if (strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0])) !== 'application/json') {
         throw new HttpError(415, 'Send the request as JSON.');
     }
-    $raw = file_get_contents('php://input', false, null, 0, 8193);
-    if ($raw === false || strlen($raw) > 8192) throw new HttpError(413, 'The request is too large.');
+    $raw = file_get_contents('php://input', false, null, 0, $maxBytes + 1);
+    if ($raw === false || strlen($raw) > $maxBytes) throw new HttpError(413, 'The request is too large.');
     try {
         $body = json_decode($raw, false, 16, JSON_THROW_ON_ERROR);
     } catch (JsonException $error) {
