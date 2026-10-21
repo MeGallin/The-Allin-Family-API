@@ -9,6 +9,7 @@ require __DIR__ . '/src/auth.php';
 require __DIR__ . '/src/activity.php';
 require __DIR__ . '/src/shopping.php';
 require __DIR__ . '/src/profiles.php';
+require __DIR__ . '/src/admin-members.php';
 require __DIR__ . '/src/calendar.php';
 require __DIR__ . '/src/memories.php';
 require __DIR__ . '/src/notes.php';
@@ -47,6 +48,8 @@ $routes = [
     '/shopping/check' => ['POST'], '/shopping/remove' => ['POST'],
     '/profile' => ['GET'], '/profile/nickname' => ['POST'],
     '/admin/users' => ['GET'], '/admin/users/nickname' => ['POST'],
+    '/admin/members' => ['GET'], '/admin/members/add' => ['POST'],
+    '/admin/members/edit' => ['POST'], '/admin/members/password' => ['POST'],
     '/calendar' => ['GET'], '/calendar/add' => ['POST'],
     '/calendar/edit' => ['POST'], '/calendar/remove' => ['POST'],
     '/memories' => ['GET'], '/memories/photo' => ['GET'],
@@ -139,6 +142,12 @@ if ($path === '/memories' || str_starts_with($path, '/memories/')) {
 if ($path === '/calendar' || str_starts_with($path, '/calendar/')) {
     $user = requireFamilyUser($db);
     jsonResponse($path === '/calendar' ? calendarSnapshot($db) : mutateCalendar($db, $user, substr($path, strlen('/calendar/')), requestJson()));
+    exit;
+}
+if ($path === '/admin/members' || str_starts_with($path, '/admin/members/')) {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/admin/members' ? adminMembersSnapshot($db, $user) :
+        mutateAdminMember($db, $user, substr($path, strlen('/admin/members/')), requestJson()));
     exit;
 }
 if (in_array($path, ['/profile', '/profile/nickname', '/admin/users', '/admin/users/nickname'], true)) {

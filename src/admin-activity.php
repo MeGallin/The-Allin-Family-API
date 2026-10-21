@@ -28,7 +28,7 @@ function adminActivitySnapshot(PDO $db, array $user, array $query): array
     $statement = $db->prepare("SELECT a.*, u.nickname, u.display_name AS current_name,
         target.display_name AS target_name, target.nickname AS target_nickname
         FROM activity_events a LEFT JOIN users u ON u.id = a.actor_id
-        LEFT JOIN users target ON a.entity_type = 'user_profile' AND target.id = a.entity_id
+        LEFT JOIN users target ON a.entity_type IN ('user_profile', 'user_account') AND target.id = a.entity_id
         WHERE " . $where . ' ORDER BY a.id DESC LIMIT 51');
     $statement->execute($args);
     $rows = $statement->fetchAll();

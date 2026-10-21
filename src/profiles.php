@@ -11,6 +11,19 @@ function adminFamilyProfiles(PDO $db): array
     return ['users' => array_map('publicFamilyUser', $db->query('SELECT id, username, display_name, nickname, profile_version, role, must_change_password FROM users WHERE is_active = 1 ORDER BY display_name, id')->fetchAll())];
 }
 
+function familyProfileText($value, string $label, int $max, bool $required = true): string
+{
+    if (!is_string($value) || preg_match('//u', $value) !== 1 ||
+        preg_match('/[\p{Cc}\p{Zl}\p{Zp}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', $value)) {
+        throw new HttpError(422, 'Enter ' . $label . ' without line breaks or control characters.');
+    }
+    $value = trim(preg_replace('/\s+/u', ' ', $value));
+    if (($required && $value === '') || preg_match_all('/./us', $value) > $max) {
+        throw new HttpError(422, 'Use ' . $label . ' of ' . ($required ? '1' : '0') . ' to ' . $max . ' characters.');
+    }
+    return $value;
+}
+
 function changeFamilyNickname(PDO $db, array $actor, array $body, bool $admin): array
 {
     if ($admin) requireFamilyAdmin($actor);
@@ -18,13 +31,7 @@ function changeFamilyNickname(PDO $db, array $actor, array $body, bool $admin): 
     if (!is_int($id) || $id < 1 || !isset($body['version']) || !is_int($body['version']) || $body['version'] < 1) {
         throw new HttpError(422, 'Reload the profile and try again.');
     }
-    $nickname = $body['nickname'] ?? null;
-    if (!is_string($nickname) || preg_match('//u', $nickname) !== 1 ||
-        preg_match('/[\p{Cc}\p{Zl}\p{Zp}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', $nickname)) {
-        throw new HttpError(422, 'Enter a nickname without line breaks or control characters.');
-    }
-    $nickname = trim(preg_replace('/\s+/u', ' ', $nickname));
-    if (preg_match_all('/./us', $nickname) > 40) throw new HttpError(422, 'Use a nickname of up to 40 characters.');
+    $nickname = familyProfileText($body['nickname'] ?? null, 'a nickname', 40, false);
     $nickname = $nickname === '' ? null : $nickname;
     $db->beginTransaction();
     try {

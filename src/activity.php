@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 function sharedActivityTypes(): array
 {
-    return ['shopping_item', 'calendar_event', 'memory', 'poll', 'user_profile'];
+    return ['shopping_item', 'calendar_event', 'memory', 'poll', 'user_profile', 'user_account'];
 }
 
 // Call inside the same transaction as the domain write. Actor identity comes only from the session.

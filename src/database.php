@@ -20,10 +20,13 @@ function connectDatabase(array $configuration): PDO
         $configuration['DB_NAME']
     );
 
-    return new PDO($dsn, $configuration['DB_USER'], $configuration['DB_PASSWORD'], [
+    $db = new PDO($dsn, $configuration['DB_USER'], $configuration['DB_PASSWORD'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
         PDO::ATTR_TIMEOUT => 5,
     ]);
+    // DATETIME defaults must use the same UTC clock as explicit audit/usage writes.
+    $db->exec("SET time_zone = '+00:00'");
+    return $db;
 }

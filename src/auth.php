@@ -204,15 +204,28 @@ function changeFamilyPassword(PDO $db, array $config, array $body): array
     }
     validatePassword($password);
     if ($current === $password) throw new HttpError(422, 'Choose a different password.');
-    $statement = $db->prepare('UPDATE users SET password_hash = ?, must_change_password = 0,
-        auth_version = auth_version + 1 WHERE id = ? AND auth_version = ? AND is_active = 1');
-    $statement->execute([hashFamilyPassword($password), $user['id'], $user['auth_version']]);
-    if ($statement->rowCount() !== 1) {
-        clearFamilySession($db);
-        throw new HttpError(401, 'Please sign in again.', 'unauthenticated');
+    $hash = hashFamilyPassword($password);
+    $db->beginTransaction();
+    try {
+        $statement = $db->prepare('UPDATE users SET password_hash = ?, must_change_password = 0,
+            auth_version = auth_version + 1, profile_version = profile_version + 1
+            WHERE id = ? AND auth_version = ? AND is_active = 1');
+        $statement->execute([$hash, $user['id'], $user['auth_version']]);
+        if ($statement->rowCount() !== 1) {
+            throw new HttpError(401, 'Please sign in again.', 'unauthenticated');
+        }
+        recordActivity($db, $user, 'user_account', (int)$user['id'], 'password_changed',
+            ['mustChangePassword'=>(bool)$user['must_change_password']], ['mustChangePassword'=>false]);
+        revokeMemberSessions($db, (int)$user['id'], $_SESSION['usage_key'] ?? null);
+        $query = $db->prepare('SELECT * FROM users WHERE id=?');
+        $query->execute([$user['id']]);
+        $user = $query->fetch();
+        $db->commit();
+    } catch (Throwable $error) {
+        $db->rollBack();
+        if ($error instanceof HttpError && $error->status === 401) clearFamilySession($db);
+        throw $error;
     }
-    $user['auth_version']++;
-    $user['must_change_password'] = 0;
     clearSuccessfulAttempts($db, $config, 'password', $user['username']);
     $usageKey = $_SESSION['usage_key'] ?? null;
     establishFamilySession($user);

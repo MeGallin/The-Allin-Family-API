@@ -409,3 +409,42 @@ including ones with no recorded use. The private tracking key is never returned.
 Only allowlisted section names are saved: no note IDs/content, queries, IPs,
 device fingerprints or raw authentication identifiers. Usage is separate from
 the shared content audit feed. Times are UTC; the UI formats them locally.
+
+## Administrator family accounts
+
+- GET /admin/members: all active and paused accounts as public member profiles,
+  with enabled and createdAt. Hashes and authentication versions are never returned.
+- POST /admin/members/add: username, displayName, nickname, role (member/admin),
+  enabled=true. Creates an account requiring a password change and returns a
+  generated temporaryPassword once, alongside member and the actor's self profile.
+- POST /admin/members/edit: the same editable fields plus integer id and version
+  (profileVersion). Can pause/restore access and change roles. No-op saves do not
+  produce audit entries. Stale versions return409; duplicate usernames return409.
+- POST /admin/members/password: integer id and version. Resets another active
+  member's password, requires a change at next sign-in and returns the generated
+  temporary password once. The admin must share it privately. Own passwords use
+  the existing current-password flow, not the support reset endpoint.
+
+All routes use existing authenticated server roles and CSRF/origin checks. Account
+writes lock the family directory in ID order, revalidate the actor inside the
+transaction and compare profileVersion to prevent stale writes. Admins cannot
+pause or demote themselves, so concurrent edits cannot remove the final active
+administrator. Password resets, role changes and access changes increment
+existing auth_version and revoke tracked sessions atomically. Changing one's own
+password revokes other sessions, retains the current usage record and increments
+profile_version as well, so a pending admin edit cannot mask the changed state.
+
+recordActivity stores user_account events in the same transaction: creation,
+edits, password_reset and password_changed. Only explicitly projected public
+fields reach before/after history. Passwords, hashes, auth versions and session
+keys are excluded. The existing allowlist, account target join and insight
+aggregation include these events. Paused users retain content and audit history.
+The generated credential is hashed with the existing Argon2id helper; plaintext
+is returned only in the no-store response and never saved to disk. Lost responses
+cannot recover a password; inspect the directory before retrying creation or issue
+a fresh reset if necessary. No email delivery or migration is part of this feature.
+
+Database connections explicitly set the session time zone to UTC. This keeps
+CURRENT_TIMESTAMP defaults (including account creation) aligned with explicit
+UTC audit/usage timestamps, avoiding future-looking join times on BST servers.
+Existing stored DATETIME values are not rewritten.
