@@ -1,0 +1,1 @@
+ALTER TABLE shopping_items ADD COLUMN important TINYINT(1) NOT NULL DEFAULT 0 AFTER checked;

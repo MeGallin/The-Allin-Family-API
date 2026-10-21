@@ -89,9 +89,46 @@ The admin/member roles are stored for future permission rules.
 | GET | `/admin/users` | Administrator only; active accounts' public profiles |
 | POST | `/admin/users/nickname` | Administrator only; target `id`, `nickname`, `version` |
 
-The family route is a protected starting page, not a calendar implementation.
+## Shared calendar
+
+Apply migrations `005_calendar_events.sql`, `006_calendar_all_day.sql` and `007_calendar_annual.sql` before deploying calendar support:
+`C:/xampp/php/php.exe bin/migrate.php --local` for the isolated local installation.
+
+All active family accounts can view and update the shared calendar. GET `/calendar`
+returns active events ordered by start time and the latest 100 calendar activity
+records. POST `/calendar/add` accepts `title` (1–80 characters), `detail` (0–300),
+`startsAt` (UTC ISO timestamp with milliseconds), boolean `allDay`, an IANA `timeZone`, and a UUID v4
+`requestKey`. Retries are deduplicated per session user. POST `/calendar/edit`
+accepts the same event fields plus string `id` and integer `version`.
+POST `/calendar/remove` takes `id` and `version` and preserves the event as a
+soft-deleted record. All writes require an authenticated account and CSRF token.
+
+Creator/updater IDs and UTC timestamps are set by the server. Version checks and
+row locks reject stale edits or removals with HTTP 409 `calendar_conflict`.
+Actual changes write `calendar_event` activity with actor ID, original full-name
+snapshot, before/after values and UTC time in the same transaction. No-op edits
+do not create activity. Display names resolve current nicknames/first names.
+Timed start instants are stored in UTC; the supplied time zone is retained for
+context. All-day entries encode their civil date at UTC midnight with `allDay: true`;
+clients display that date without converting it to another day. A non-midnight
+timestamp for an all-day entry is rejected. `allDay` defaults to false for older clients.
+Boolean `annually` enables yearly recurrence for all-day events, including birthdays.
+It defaults to false and is rejected for timed entries. One database record retains
+the original date and annual rule; clients derive the next occurrence. No duplicate
+rows or scheduled job are needed. Edits and removal affect the whole series and are
+audited through the same version-protected endpoints. A 29 February entry falls on
+28 February in non-leap years and returns to 29 February in leap years.
+Other repeat patterns, occurrence exceptions, reminders and external calendar
+synchronisation are not implemented.
 
 ## Shared shopping and attribution
+
+Migration `008_shopping_important.sql` adds the shared boolean `important` flag.
+Add accepts it optionally (default false); edit can change it alongside the title.
+If an older client omits it on edit, the existing value is retained. Other writes
+preserve importance. Invalid non-boolean flags are rejected. Reads order important
+items first, then by newest creation time/id within each group. Importance edits
+use the same version/row-lock checks and actor-attributed before/after activity.
 
 ### Nicknames
 

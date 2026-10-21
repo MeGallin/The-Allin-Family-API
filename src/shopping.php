@@ -9,7 +9,7 @@ function shoppingSnapshot(PDO $db): array
         $rows = $db->query('SELECT s.*, c.display_name AS creator_name, u.display_name AS updater_name,
             c.nickname AS creator_nickname, u.nickname AS updater_nickname
             FROM shopping_items s JOIN users c ON c.id = s.created_by JOIN users u ON u.id = s.updated_by
-            WHERE s.deleted_at IS NULL ORDER BY s.created_at DESC, s.id DESC')->fetchAll();
+            WHERE s.deleted_at IS NULL ORDER BY s.important DESC, s.created_at DESC, s.id DESC')->fetchAll();
         $events = $db->query("SELECT e.*, u.nickname AS actor_nickname, u.display_name AS actor_current_name
             FROM activity_events e LEFT JOIN users u ON u.id = e.actor_id
             WHERE e.entity_type = 'shopping_item' ORDER BY e.id DESC LIMIT 100")->fetchAll();
@@ -20,7 +20,7 @@ function shoppingSnapshot(PDO $db): array
     }
     return [
         'items' => array_map(static fn(array $row): array => [
-            'id' => (string) $row['id'], 'title' => $row['title'], 'checked' => (bool) $row['checked'],
+            'id' => (string) $row['id'], 'title' => $row['title'], 'checked' => (bool) $row['checked'], 'important' => (bool) $row['important'],
             'version' => (int) $row['version'],
             'createdBy' => ['id' => (int) $row['created_by'], 'displayName' => familyDisplayName(['display_name' => $row['creator_name'], 'nickname' => $row['creator_nickname']])],
             'updatedBy' => ['id' => (int) $row['updated_by'], 'displayName' => familyDisplayName(['display_name' => $row['updater_name'], 'nickname' => $row['updater_nickname']])],
@@ -51,6 +51,7 @@ function shoppingTitle(array $body): string
 function mutateShopping(PDO $db, array $user, string $operation, array $body): array
 {
     $title = in_array($operation, ['add', 'edit'], true) ? shoppingTitle($body) : null;
+    if (array_key_exists('important', $body) && !is_bool($body['important'])) throw new HttpError(422, 'Choose whether the item is important.');
     if ($operation === 'add' && (!isset($body['requestKey']) || !is_string($body['requestKey']) ||
         !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $body['requestKey']))) {
         throw new HttpError(422, 'Refresh the page and try adding the item again.');
@@ -68,11 +69,12 @@ function mutateShopping(PDO $db, array $user, string $operation, array $body): a
         if ($operation === 'add') {
             // The key is scoped to this user so retries cannot duplicate an already-saved addition.
             $requestKey = substr(hash('sha256', $user['id'] . ':' . $body['requestKey']), 0, 36);
-            $insert = $db->prepare('INSERT INTO shopping_items (title, created_by, updated_by, created_at, updated_at, request_key)
-                VALUES (?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)');
-            $insert->execute([$title, $user['id'], $user['id'], $requestKey]);
+            $important = $body['important'] ?? false;
+            $insert = $db->prepare('INSERT INTO shopping_items (title, important, created_by, updated_by, created_at, updated_at, request_key)
+                VALUES (?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)');
+            $insert->execute([$title, (int) $important, $user['id'], $user['id'], $requestKey]);
             $id = (int) $db->lastInsertId();
-            if ($insert->rowCount() === 1) recordActivity($db, $user, 'shopping_item', $id, 'created', null, ['title' => $title, 'checked' => false]);
+            if ($insert->rowCount() === 1) recordActivity($db, $user, 'shopping_item', $id, 'created', null, ['title' => $title, 'checked' => false, 'important' => $important]);
         } else {
             $query = $db->prepare('SELECT * FROM shopping_items WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
             $query->execute([$body['id']]);
@@ -81,15 +83,16 @@ function mutateShopping(PDO $db, array $user, string $operation, array $body): a
                 throw new HttpError(409, 'Someone else changed this item. The list has been refreshed; please try again.', 'shopping_conflict');
             }
             $id = (int) $item['id'];
-            $before = ['title' => $item['title'], 'checked' => (bool) $item['checked']];
+            $before = ['title' => $item['title'], 'checked' => (bool) $item['checked'], 'important' => (bool) $item['important']];
             $after = $before;
             if ($operation === 'edit') $after['title'] = $title;
+            if ($operation === 'edit' && array_key_exists('important', $body)) $after['important'] = $body['important'];
             if ($operation === 'check') $after['checked'] = $body['checked'];
             if ($operation === 'remove' || $before !== $after) {
-                $db->prepare('UPDATE shopping_items SET title = ?, checked = ?, updated_by = ?,
+                $db->prepare('UPDATE shopping_items SET title = ?, checked = ?, important = ?, updated_by = ?,
                     updated_at = UTC_TIMESTAMP(6), version = version + 1, deleted_at = ' .
                     ($operation === 'remove' ? 'UTC_TIMESTAMP(6)' : 'NULL') . ' WHERE id = ?')
-                    ->execute([$after['title'], (int) $after['checked'], $user['id'], $id]);
+                    ->execute([$after['title'], (int) $after['checked'], (int) $after['important'], $user['id'], $id]);
                 $action = $operation === 'remove' ? 'removed' : ($operation === 'edit' ? 'edited' : ($after['checked'] ? 'checked' : 'unchecked'));
                 recordActivity($db, $user, 'shopping_item', $id, $action, $before, $operation === 'remove' ? null : $after);
             }

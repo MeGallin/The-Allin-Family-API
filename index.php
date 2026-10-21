@@ -9,6 +9,7 @@ require __DIR__ . '/src/auth.php';
 require __DIR__ . '/src/activity.php';
 require __DIR__ . '/src/shopping.php';
 require __DIR__ . '/src/profiles.php';
+require __DIR__ . '/src/calendar.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -39,6 +40,8 @@ $routes = [
     '/shopping/check' => ['POST'], '/shopping/remove' => ['POST'],
     '/profile' => ['GET'], '/profile/nickname' => ['POST'],
     '/admin/users' => ['GET'], '/admin/users/nickname' => ['POST'],
+    '/calendar' => ['GET'], '/calendar/add' => ['POST'],
+    '/calendar/edit' => ['POST'], '/calendar/remove' => ['POST'],
 ];
 if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', $routes[$path], true)) {
@@ -65,6 +68,11 @@ if ($path === '/auth/logout') {
 }
 
 $db = connectDatabase($configuration);
+if ($path === '/calendar' || str_starts_with($path, '/calendar/')) {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/calendar' ? calendarSnapshot($db) : mutateCalendar($db, $user, substr($path, strlen('/calendar/')), requestJson()));
+    exit;
+}
 if (in_array($path, ['/profile', '/profile/nickname', '/admin/users', '/admin/users/nickname'], true)) {
     $user = requireFamilyUser($db);
     if (str_starts_with($path, '/admin/')) requireFamilyAdmin($user);
