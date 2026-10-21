@@ -3,7 +3,7 @@ RewriteEngine On
 
 # Never serve configuration, Git metadata or PHP source directories directly.
 RewriteRule (^|/)\. - [F,L]
-RewriteRule ^(?:src|vendor)(?:/|$) - [F,L,NC]
-RewriteRule ^(?:README\.md|router\.php|serve\.ps1|composer\.(?:json|lock))$ - [F,L,NC]
+RewriteRule ^(?:src|vendor|bin|migrations|tests)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:README\.md|router\.php|.*\.ps1|composer\.(?:json|lock))$ - [F,L,NC]
 RewriteRule ^index\.php$ - [L]
 RewriteRule ^ index.php [QSA,L]

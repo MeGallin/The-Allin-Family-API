@@ -6,4 +6,5 @@
 .DS_Store
 Thumbs.db
 vendor/
+.local/
 
