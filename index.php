@@ -12,6 +12,9 @@ require __DIR__ . '/src/profiles.php';
 require __DIR__ . '/src/calendar.php';
 require __DIR__ . '/src/memories.php';
 require __DIR__ . '/src/notes.php';
+require __DIR__ . '/src/polls.php';
+require __DIR__ . '/src/admin-activity.php';
+require __DIR__ . '/src/usage.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -49,6 +52,10 @@ $routes = [
     '/memories/remove' => ['POST'], '/memories/react' => ['POST'],
     '/notes' => ['GET'], '/notes/add' => ['POST'],
     '/notes/edit' => ['POST'], '/notes/remove' => ['POST'],
+    '/polls' => ['GET'], '/polls/add' => ['POST'], '/polls/edit' => ['POST'],
+    '/polls/vote' => ['POST'], '/polls/close' => ['POST'], '/polls/remove' => ['POST'],
+    '/admin/activity' => ['GET'],
+    '/auth/presence' => ['POST'], '/admin/usage' => ['GET'],
 ];
 if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', $routes[$path], true)) {
@@ -60,9 +67,25 @@ if ($path === '/health') {
     exit;
 }
 
-startFamilySession($configuration);
+$db = null;
+try {
+    $db = connectDatabase($configuration);
+} catch (Throwable $error) {
+    // Database/analytics downtime must not prevent the user clearing their login cookie.
+    if ($path !== '/auth/logout') throw $error;
+    error_log('Usage recording unavailable during sign-out.');
+}
+startFamilySession($configuration, $db);
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') requireCsrf($configuration);
 if ($path === '/auth/logout') {
+    $logoutBody = requestJson();
+    if ($db !== null) {
+        try {
+            endPlatformSession($db, 'logout', $logoutBody['page'] ?? null);
+        } catch (Throwable $error) {
+            error_log('Usage recording unavailable during sign-out.');
+        }
+    }
     $_SESSION = [];
     session_destroy();
     $cookie = session_get_cookie_params();
@@ -74,7 +97,26 @@ if ($path === '/auth/logout') {
     exit;
 }
 
-$db = connectDatabase($configuration);
+if ($path === '/auth/presence') {
+    $user = requireFamilyUser($db);
+    jsonResponse(recordPlatformPresence($db, $user, requestJson()));
+    exit;
+}
+if ($path === '/admin/usage') {
+    $user = requireFamilyUser($db);
+    jsonResponse(adminUsageSnapshot($db, $user, $_GET));
+    exit;
+}
+if ($path === '/admin/activity') {
+    $user = requireFamilyUser($db);
+    jsonResponse(adminActivitySnapshot($db, $user, $_GET));
+    exit;
+}
+if ($path === '/polls' || str_starts_with($path, '/polls/')) {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/polls' ? pollsSnapshot($db, $user) : mutatePoll($db, $user, substr($path, strlen('/polls/')), requestJson()));
+    exit;
+}
 if ($path === '/notes' || str_starts_with($path, '/notes/')) {
     $user = requireFamilyUser($db);
     jsonResponse($path === '/notes' ? personalNotesSnapshot($db, $user) : mutatePersonalNote($db, $user, substr($path, strlen('/notes/')), requestJson(100000)));

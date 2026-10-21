@@ -304,3 +304,83 @@ It never changes family accounts. Local database administrator settings are
 required, and the suite refuses to overwrite an existing test database.
 
 Repository: https://github.com/MeGallin/The-Allin-Family-API
+
+
+## Family polls and administrator activity
+
+Apply migration 011 before deploying the polls client. GET /polls returns active
+polls, fixed choices, aggregate results and only the signed-in person's current
+ballot/revision. There is no sample poll seed. All signed-in family members may
+POST /polls/add with a title (1-160 characters), optional detail (up to 1000),
+two to six distinct choices (1-80 each) and a UUID requestKey. Text is plain UTF-8
+and the existing bounded JSON/CSRF/origin checks apply. User-scoped keys make
+unchanged addition retries idempotent.
+
+POST /polls/vote accepts id, poll version, voteVersion and optionId. A null option
+withdraws the vote. The voter ID always comes from the session; client actor/user
+fields cannot change it. A primary key enforces one ballot per person/poll and a
+composite foreign key keeps choices inside their own poll. A poll-row lock
+serialises voting with close/remove; independent ballot revisions reject stale
+changes from another window without making other people's votes conflict.
+Repeated identical votes are no-ops. Voting does not alter the poll editor/version.
+
+POST /polls/edit changes only title/detail. /polls/close takes a closed boolean and
+can close/reopen voting. /polls/remove sets deleted_at. These three operations are
+creator/admin only and require the latest poll version. Closed/removed polls reject
+new votes. Choices are immutable so edits never silently reinterpret existing
+votes. Soft removal retains ballots and the activity history. Client record removal
+uses the common 30-second countdown/Undo; the API applies the final authorised,
+version-protected request after the delay.
+
+Poll creates/edits/close/reopen/removals and votes/changes/withdrawals write actor,
+UTC time and before/after details to activity_events in the same transaction.
+Voting is not anonymous: the client explicitly tells participants that
+administrators can inspect voter names and choices.
+
+GET /admin/activity requires an authenticated administrator. It returns newest
+shared changes in pages of 50, with optional type, actor and before-ID filters and
+nextCursor. Types are explicitly limited to shopping_item, calendar_event, memory,
+poll and user_profile. Memory likes/unlikes are already recorded here. Current
+nicknames identify actors, and profile changes include the affected person's name.
+Personal note content/history is never included, including for administrators.
+Only existing shared-content snapshots are exposed; credentials and sessions are
+not part of this feed. No super-admin role was introduced.
+
+Generated local examples were removed at Gary's explicit request. Maintenance
+recovery copies remain private under ignored .local/cleanup-backups; those files
+and real database/media content must never enter Git or deployment bundles.
+
+## Administrator platform usage
+
+Apply migrations012 and013 before deploying this increment. Successful /auth/login creates
+one platform_sessions record with a login timestamp. Password changes rotate the
+authentication session while preserving the usage record, so they do not inflate
+login counts. Sessions already open when tracking is introduced are first observed
+by presence and have a null login_at. No earlier login history is invented.
+
+POST /auth/presence uses existing authentication, CSRF and origin checks, accepting
+only a section page and boolean active flag. The user and tracking key come from
+the server session. An atomic update credits the previous active interval only
+when the server-clock gap is no more than60 seconds. Overlapping heartbeats from
+tabs sharing a login cannot double-credit the same elapsed interval. Missing or
+long-delayed heartbeats do not credit offline time. Activity estimates are not
+exact attendance records and can undercount interrupted/closed tabs.
+The heartbeat clock is separate from last active time: inactive/background signals
+do not make a member appear recently active or overwrite the last active section.
+
+The client sends presence about every30 seconds while visible and on navigation,
+idle recovery and visibility changes. It considers input recent for60 seconds;
+ordinary content refresh/polling does not count as input. Hidden tabs stop periodic
+presence requests. Explicit logout records its server time and current section.
+Expiration, revocation and replacement are distinguished from logout. Sessions
+with no signal for over120 seconds display inactive, with no claimed logout time.
+No unreliable browser-unload request is required.
+
+GET /admin/usage is server-enforced admin-only. Validated filters days (7,30,90,0
+for all history), user and before-ID return all member summaries and up to25 recent
+sessions with a cursor. Totals cover sessions started in the selected period;
+last-login and last-seen timestamps cover all history. All accounts are included,
+including ones with no recorded use. The private tracking key is never returned.
+Only allowlisted section names are saved: no note IDs/content, queries, IPs,
+device fingerprints or raw authentication identifiers. Usage is separate from
+the shared content audit feed. Times are UTC; the UI formats them locally.

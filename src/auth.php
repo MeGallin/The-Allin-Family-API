@@ -17,7 +17,7 @@ function validatePassword(string $password): void
     }
 }
 
-function startFamilySession(array $config): void
+function startFamilySession(array $config, ?PDO $db): void
 {
     if (strlen($config['APP_KEY']) < 32) throw new RuntimeException('Configure APP_KEY before using accounts.');
     $secure = $config['SESSION_COOKIE_SECURE'] === '1';
@@ -44,13 +44,21 @@ function startFamilySession(array $config): void
     if (isset($_SESSION['user_id']) && (
         $now - (int) ($_SESSION['last_seen'] ?? 0) >= (int) $config['SESSION_IDLE_SECONDS'] ||
         $now - (int) ($_SESSION['started_at'] ?? 0) >= (int) $config['SESSION_LIFETIME_SECONDS']
-    )) clearFamilySession();
+    )) clearFamilySession($db, 'expired');
     if (isset($_SESSION['user_id'])) $_SESSION['last_seen'] = $now;
     if (!isset($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
 }
 
-function clearFamilySession(): void
+function clearFamilySession(?PDO $db, string $reason = 'revoked'): void
 {
+    if ($db !== null) {
+        try {
+            endPlatformSession($db, $reason);
+        } catch (Throwable $error) {
+            // Revocation and expiry must still clear authentication if analytics is unavailable.
+            error_log('Usage recording unavailable while ending a session.');
+        }
+    }
     $_SESSION = [];
     session_regenerate_id(true);
     $_SESSION['csrf'] = bin2hex(random_bytes(32));
@@ -76,7 +84,7 @@ function currentFamilyUser(PDO $db): ?array
     $user = $statement->fetch();
     if (!$user || !(bool) $user['is_active'] ||
         (int) $user['auth_version'] !== (int) ($_SESSION['auth_version'] ?? 0)) {
-        clearFamilySession();
+        clearFamilySession($db);
         return null;
     }
     return $user;
@@ -179,7 +187,9 @@ function loginFamilyUser(PDO $db, array $config, array $body): array
         throw new HttpError(401, 'The username or password is incorrect.');
     }
     clearSuccessfulAttempts($db, $config, 'login', $username);
+    endPlatformSession($db, 'replaced');
     establishFamilySession($user);
+    beginPlatformSession($db, $user, true, $body['page'] ?? '/');
     return sessionResponse($user);
 }
 
@@ -198,12 +208,14 @@ function changeFamilyPassword(PDO $db, array $config, array $body): array
         auth_version = auth_version + 1 WHERE id = ? AND auth_version = ? AND is_active = 1');
     $statement->execute([hashFamilyPassword($password), $user['id'], $user['auth_version']]);
     if ($statement->rowCount() !== 1) {
-        clearFamilySession();
+        clearFamilySession($db);
         throw new HttpError(401, 'Please sign in again.', 'unauthenticated');
     }
     $user['auth_version']++;
     $user['must_change_password'] = 0;
     clearSuccessfulAttempts($db, $config, 'password', $user['username']);
+    $usageKey = $_SESSION['usage_key'] ?? null;
     establishFamilySession($user);
+    if ($usageKey !== null) $_SESSION['usage_key'] = $usageKey;
     return sessionResponse($user);
 }
