@@ -10,6 +10,7 @@ require __DIR__ . '/src/activity.php';
 require __DIR__ . '/src/shopping.php';
 require __DIR__ . '/src/profiles.php';
 require __DIR__ . '/src/calendar.php';
+require __DIR__ . '/src/memories.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -42,6 +43,9 @@ $routes = [
     '/admin/users' => ['GET'], '/admin/users/nickname' => ['POST'],
     '/calendar' => ['GET'], '/calendar/add' => ['POST'],
     '/calendar/edit' => ['POST'], '/calendar/remove' => ['POST'],
+    '/memories' => ['GET'], '/memories/photo' => ['GET'],
+    '/memories/add' => ['POST'], '/memories/edit' => ['POST'],
+    '/memories/remove' => ['POST'], '/memories/react' => ['POST'],
 ];
 if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', $routes[$path], true)) {
@@ -68,6 +72,12 @@ if ($path === '/auth/logout') {
 }
 
 $db = connectDatabase($configuration);
+if ($path === '/memories' || str_starts_with($path, '/memories/')) {
+    $user = requireFamilyUser($db);
+    if ($path === '/memories/photo') serveMemoryPhoto($db, $configuration);
+    else jsonResponse($path === '/memories' ? memoriesSnapshot($db, $user) : mutateMemory($db, $configuration, $user, substr($path, strlen('/memories/')), memoryRequest()));
+    exit;
+}
 if ($path === '/calendar' || str_starts_with($path, '/calendar/')) {
     $user = requireFamilyUser($db);
     jsonResponse($path === '/calendar' ? calendarSnapshot($db) : mutateCalendar($db, $user, substr($path, strlen('/calendar/')), requestJson()));

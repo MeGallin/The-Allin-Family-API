@@ -176,11 +176,50 @@ included yet, and the history is not a cryptographically tamper-evident ledger.
 Future persisted input features should use `src/activity.php` inside their write
 transactions and include creator/updater metadata in their own tables. Select only
 appropriate domain fields for history; credentials and session secrets must never
-be included. Calendar, memories and polls are still frontend previews and do not
-write activity events yet. This app currently models one family, not multiple tenants.
+be included. Shopping, calendar and memories now write activity events; polls are
+still a frontend preview. This app currently models one family, not multiple tenants.
 Unknown routes, including registration routes, return 404. Password hashes and
-configuration are never included in responses. POST bodies use JSON with an
-`X-CSRF-Token` header. All responses disable caching.
+configuration are never included in responses. POST bodies use JSON, except the
+multipart memory forms; both require an `X-CSRF-Token` header. All responses disable caching.
+
+## Shared memories and private photo storage
+
+Apply migration 009 before deploying this increment. `/memories` returns the family
+album, newest first, plus the latest 100 audit events. `/memories/add`, `/edit`,
+`/remove` and `/react` accept multipart forms with a JSON `payload` field and an
+optional `photo` file. Every route, including `/memories/photo?id=...&v=...`, requires
+an active signed-in family account. All family members may add/edit; removal is
+restricted to the creator or an administrator, enforced on the server.
+
+Each memory needs an 80-character title and a photo, story or both. Stories allow
+5,000 Unicode characters; photo descriptions allow 160. Edits/removals lock the row
+and require its version, returning 409 `memory_conflict` on a stale write. Addition
+keys are user-scoped and unique so retries do not duplicate a saved memory. Creator
+and updater IDs/timestamps come from the session. Full before/after text/photo
+references and actor metadata are recorded in the same database transaction.
+
+Photos are stored as original raster files in `MEMORY_PHOTO_DIRECTORY` (defaults
+to ignored `.local/memory-photos`). Files never have public static URLs: random
+storage keys map to authenticated, no-store image responses with nosniff headers.
+Filenames supplied by the user are not used for storage. MIME type and image headers
+are validated server-side: JPG/PNG/WebP only, up to 10 MiB, 24 megapixels and 8192px
+per side. SVG, arbitrary files and unsupported phone formats are rejected. File
+validation uses PHP `fileinfo` and `getimagesize`; GD is not required. Originals are
+not resized or stripped of embedded metadata. Upload errors preserve the form draft.
+
+Configure writable private storage outside the public web root on hosting. If using
+the local default, retain the provided Apache `.local` denial rules and PHP router.
+Ensure PHP `upload_max_filesize` is at least 10M, `post_max_size` is at least 11M and
+the web server permits that request size. Back up the database **and** private photo
+directory together; photos are not stored in MySQL. Do not deploy or commit uploads.
+Failed writes clean up newly staged files; superseded photos are removed after a
+successful edit. An uncertain COMMIT outcome retains the file rather than risking
+a missing saved photo. Soft removal hides the memory/photo and retains the photo
+and audit history for recovery/retention management; no restore screen is provided.
+
+Love reactions are stored once per memory/user and survive refresh. Setting the
+same desired reaction twice is idempotent; changes record the actor/time. Reactions
+do not modify content creator/updater dates or cause false edit conflicts.
 
 Passwords use Argon2id. Sessions use host-only HttpOnly, SameSite=Lax cookies,
 rotate after login and password changes, and expire after 30 minutes idle or
