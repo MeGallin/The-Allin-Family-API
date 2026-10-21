@@ -82,11 +82,21 @@ function currentFamilyUser(PDO $db): ?array
     return $user;
 }
 
+function familyDisplayName(array $user): string
+{
+    $nickname = trim((string) ($user['nickname'] ?? ''));
+    if ($nickname !== '') return $nickname;
+    $parts = preg_split('/\s+/u', trim($user['display_name']));
+    return $parts[0] ?: 'Family member';
+}
+
 function publicFamilyUser(array $user): array
 {
     return [
         'id' => (int) $user['id'], 'username' => $user['username'],
         'displayName' => $user['display_name'], 'role' => $user['role'],
+        'nickname' => $user['nickname'] ?? null, 'familyName' => familyDisplayName($user),
+        'profileVersion' => (int) ($user['profile_version'] ?? 1),
         'mustChangePassword' => (bool) $user['must_change_password'],
     ];
 }

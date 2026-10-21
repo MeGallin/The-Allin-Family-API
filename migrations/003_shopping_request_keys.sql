@@ -1,0 +1,1 @@
+ALTER TABLE shopping_items ADD COLUMN request_key CHAR(36) CHARACTER SET ascii NULL UNIQUE;

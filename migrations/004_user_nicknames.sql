@@ -1,0 +1,3 @@
+ALTER TABLE users
+    ADD COLUMN nickname VARCHAR(40) NULL,
+    ADD COLUMN profile_version INT UNSIGNED NOT NULL DEFAULT 1;

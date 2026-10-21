@@ -6,6 +6,9 @@ ini_set('zend.exception_ignore_args', '1');
 require __DIR__ . '/src/bootstrap.php';
 require __DIR__ . '/src/database.php';
 require __DIR__ . '/src/auth.php';
+require __DIR__ . '/src/activity.php';
+require __DIR__ . '/src/shopping.php';
+require __DIR__ . '/src/profiles.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -32,6 +35,10 @@ if ($mount !== '' && $mount !== '.' && ($path === $mount || str_starts_with($pat
 $routes = [
     '/health' => ['GET', 'HEAD'], '/auth/session' => ['GET'], '/auth/login' => ['POST'],
     '/auth/logout' => ['POST'], '/auth/password' => ['POST'], '/family' => ['GET'],
+    '/shopping' => ['GET'], '/shopping/add' => ['POST'], '/shopping/edit' => ['POST'],
+    '/shopping/check' => ['POST'], '/shopping/remove' => ['POST'],
+    '/profile' => ['GET'], '/profile/nickname' => ['POST'],
+    '/admin/users' => ['GET'], '/admin/users/nickname' => ['POST'],
 ];
 if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', $routes[$path], true)) {
@@ -58,6 +65,19 @@ if ($path === '/auth/logout') {
 }
 
 $db = connectDatabase($configuration);
+if (in_array($path, ['/profile', '/profile/nickname', '/admin/users', '/admin/users/nickname'], true)) {
+    $user = requireFamilyUser($db);
+    if (str_starts_with($path, '/admin/')) requireFamilyAdmin($user);
+    if ($path === '/profile') jsonResponse(['profile' => publicFamilyUser($user)]);
+    elseif ($path === '/admin/users') jsonResponse(adminFamilyProfiles($db));
+    else jsonResponse(changeFamilyNickname($db, $user, requestJson(), $path === '/admin/users/nickname'));
+    exit;
+}
+if ($path === '/shopping' || str_starts_with($path, '/shopping/')) {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/shopping' ? shoppingSnapshot($db) : mutateShopping($db, $user, substr($path, strlen('/shopping/')), requestJson()));
+    exit;
+}
 if ($path === '/auth/session') jsonResponse(sessionResponse(currentFamilyUser($db)));
 if ($path === '/auth/login') jsonResponse(loginFamilyUser($db, $configuration, requestJson()));
 if ($path === '/auth/password') jsonResponse(changeFamilyPassword($db, $configuration, requestJson()));

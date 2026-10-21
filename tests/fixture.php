@@ -16,6 +16,10 @@ if (isset($options['cleanup'])) {
     if ($fixture['DB_NAME'] !== 'theallinfamily_auth_test') throw new RuntimeException('Invalid fixture marker.');
     $db->exec('DROP DATABASE `theallinfamily_auth_test`');
     $db->exec("DROP USER IF EXISTS 'allinfamily_test'@'localhost'");
+    // A recreated fixture must not inherit a previous browser's authenticated session.
+    foreach (glob($root . '/.local/test-sessions/sess_*') as $sessionFile) {
+        if (is_file($sessionFile)) unlink($sessionFile);
+    }
     unlink($file);
     echo "Removed disposable authentication fixture.\n";
     exit;

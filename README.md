@@ -79,8 +79,68 @@ The admin/member roles are stored for future permission rules.
 | POST | `/auth/logout` | CSRF token required |
 | POST | `/auth/password` | Signed-in account and current password, CSRF token |
 | GET | `/family` | Active account with its own password chosen |
+| GET | `/shopping` | Shared active items and latest 100 shopping activity events |
+| POST | `/shopping/add` | `title`, UUID v4 `requestKey`; authenticated creation |
+| POST | `/shopping/edit` | `id` (string), `version` (integer), `title` |
+| POST | `/shopping/check` | `id`, `version`, `checked` (boolean) |
+| POST | `/shopping/remove` | `id`, `version`; soft removal, preserving history |
+| GET | `/profile` | Own public profile, including nickname and profile version |
+| POST | `/profile/nickname` | Own `nickname` (string) and `version` (integer) |
+| GET | `/admin/users` | Administrator only; active accounts' public profiles |
+| POST | `/admin/users/nickname` | Administrator only; target `id`, `nickname`, `version` |
 
 The family route is a protected starting page, not a calendar implementation.
+
+## Shared shopping and attribution
+
+### Nicknames
+
+Apply migration 004 before deploying nickname support. Each account has an optional
+nickname and a separate profile version. Members may update only their own nickname;
+administrator endpoints enforce the admin role in PHP before listing or editing
+other accounts. No name, role or credential editing is exposed by these endpoints.
+Names are trimmed, spaces normalised and limited to 40 Unicode characters, without
+line breaks or control/bidirectional override characters. A blank string clears the
+nickname. The family-facing name falls back to the first word of the full name.
+Nicknames need not be unique; permanent account IDs identify people.
+
+Public user profiles include `displayName` (full account name), `nickname`,
+`familyName` (nickname or first-name fallback) and `profileVersion`. Shopping actor
+`displayName` values use the current family-facing name. Existing actor IDs and
+original full-name audit snapshots are retained; shopping history resolves the
+current nickname when presented. Changing a nickname never rewrites old events.
+
+Nickname writes lock the target account and require its current version. Stale
+edits return 409 `profile_conflict`. Actual changes append `nickname_changed`
+activity for the target user with the acting account ID, timestamp and before/after
+nicknames in the same transaction. No-op saves create no event. Existing username,
+full name, password and session version are unchanged by nickname editing.
+
+All active family members share one shopping list. The list starts empty; preview
+fixtures are not imported. Shopping routes require an authenticated active account
+that has completed first-login requirements. Every POST requires CSRF validation.
+Actor IDs and names come from the server session and database, never request fields.
+
+Apply migrations 002 and 003 before deploying this increment. Items contain creator,
+last updater, UTC timestamps and an integer version. Edits, checks and removals lock
+the row and compare that version; stale writes return 409 `shopping_conflict` instead
+of silently overwriting another member. Add requests use a user-scoped request key
+to make retrying a failed response safe. Names are limited to 100 Unicode characters.
+Mutation responses return the current list and recent history, as GET does.
+
+`activity_events` records entity type/ID, action, actor ID, actor name at the time,
+UTC timestamp and the before/after item title and checked state. Item writes and
+activity records share one transaction. Removal sets deleted_at rather than deleting
+the item or its history. The latest 100 events are returned to family members;
+older events remain available in the database for future authorised analytics.
+Indexes support entity history and actor/time analysis. No analytics dashboard is
+included yet, and the history is not a cryptographically tamper-evident ledger.
+
+Future persisted input features should use `src/activity.php` inside their write
+transactions and include creator/updater metadata in their own tables. Select only
+appropriate domain fields for history; credentials and session secrets must never
+be included. Calendar, memories and polls are still frontend previews and do not
+write activity events yet. This app currently models one family, not multiple tenants.
 Unknown routes, including registration routes, return 404. Password hashes and
 configuration are never included in responses. POST bodies use JSON with an
 `X-CSRF-Token` header. All responses disable caching.
