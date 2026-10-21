@@ -15,6 +15,8 @@ require __DIR__ . '/src/notes.php';
 require __DIR__ . '/src/polls.php';
 require __DIR__ . '/src/admin-activity.php';
 require __DIR__ . '/src/usage.php';
+require __DIR__ . '/src/reporting.php';
+require __DIR__ . '/src/admin-insights.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -56,6 +58,7 @@ $routes = [
     '/polls/vote' => ['POST'], '/polls/close' => ['POST'], '/polls/remove' => ['POST'],
     '/admin/activity' => ['GET'],
     '/auth/presence' => ['POST'], '/admin/usage' => ['GET'],
+    '/admin/insights' => ['GET'],
 ];
 if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', $routes[$path], true)) {
@@ -105,6 +108,11 @@ if ($path === '/auth/presence') {
 if ($path === '/admin/usage') {
     $user = requireFamilyUser($db);
     jsonResponse(adminUsageSnapshot($db, $user, $_GET));
+    exit;
+}
+if ($path === '/admin/insights') {
+    $user = requireFamilyUser($db);
+    jsonResponse(adminInsightsSnapshot($db, $user, $_GET));
     exit;
 }
 if ($path === '/admin/activity') {

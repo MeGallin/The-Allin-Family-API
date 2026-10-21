@@ -350,6 +350,31 @@ Generated local examples were removed at Gary's explicit request. Maintenance
 recovery copies remain private under ignored .local/cleanup-backups; those files
 and real database/media content must never enter Git or deployment bundles.
 
+## Administrator insight aggregation
+
+GET /admin/insights requires the existing admin role and validates days=7,30,90.
+It returns a consistent read snapshot of the selected period: daily shared actions
+by category, successful sign-ins, distinct daily contributors, feature rankings,
+all-member contribution/login/estimated-time figures and coverage metadata.
+Aggregation covers complete audit history in the date range, not an audit-feed
+page. SQL aggregates by UTC hour/actor/type/action; PHP groups into Europe/London
+calendar dates, including DST boundaries. Only aggregate counts leave this route;
+audit snapshots, credentials and private note records are not fetched.
+
+sharedActivityTypes() supplies one explicit allowlist to both the audit feed and
+insights. Categories are created, updated (including shopping checks), responded
+(votes/reactions including changes/withdrawals), removed. No shared note category
+is permitted. Before available history begins, daily values are null rather than
+invented zeros. Prior-period action totals are withheld until recorded history
+predates that full prior period. This is observed coverage, not a guarantee that
+unrecorded historic usage can be reconstructed. Today is partial.
+
+reporting.php owns the shared London calendar-day period bounds. Usage details now
+uses the same bounds, so an overview member drill-down keeps the same period. Active
+time remains the sum for sessions started in that period; it is not fabricated into
+daily time allocations or per-feature dwell time. No migration or fixture data is
+needed for this increment.
+
 ## Administrator platform usage
 
 Apply migrations012 and013 before deploying this increment. Successful /auth/login creates

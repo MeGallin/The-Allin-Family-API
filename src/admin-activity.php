@@ -4,7 +4,7 @@ declare(strict_types=1);
 function adminActivitySnapshot(PDO $db, array $user, array $query): array
 {
     requireFamilyAdmin($user);
-    $types = ['shopping_item', 'calendar_event', 'memory', 'poll', 'user_profile'];
+    $types = sharedActivityTypes();
     $type = $query['type'] ?? '';
     $actor = $query['actor'] ?? '';
     $before = $query['before'] ?? '';
@@ -17,8 +17,8 @@ function adminActivitySnapshot(PDO $db, array $user, array $query): array
         }
     }
     // This allowlist excludes private notes even if another feature accidentally logs them here.
-    $where = "a.entity_type IN ('shopping_item','calendar_event','memory','poll','user_profile')";
-    $args = [];
+    $where = 'a.entity_type IN (' . implode(',', array_fill(0, count($types), '?')) . ')';
+    $args = $types;
     foreach (['a.entity_type' => $type, 'a.actor_id' => $actor, 'a.id' => $before] as $field => $value) {
         if ($value !== '') {
             $where .= ' AND ' . $field . ($field === 'a.id' ? ' < ?' : ' = ?');

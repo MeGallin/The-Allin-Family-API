@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+function sharedActivityTypes(): array
+{
+    return ['shopping_item', 'calendar_event', 'memory', 'poll', 'user_profile'];
+}
+
 // Call inside the same transaction as the domain write. Actor identity comes only from the session.
 function recordActivity(PDO $db, array $user, string $entityType, int $entityId, string $action, ?array $before, ?array $after): void
 {

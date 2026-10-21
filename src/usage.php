@@ -88,7 +88,8 @@ function adminUsageSnapshot(PDO $db, array $user, array $query): array
             throw new HttpError(422, 'Choose a valid usage filter.');
         }
     }
-    $since = $days === '0' ? '1970-01-01 00:00:00' : gmdate('Y-m-d H:i:s', time() - (int)$days * 86400);
+    $since = $days === '0' ? '1970-01-01 00:00:00' : familyReportingWindow((int)$days)['start']
+        ->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
     $statement = $db->prepare('SELECT u.id,u.username,u.display_name,u.nickname,u.is_active,
         COUNT(s.login_at) AS logins, COALESCE(SUM(s.active_seconds),0) AS seconds,
         MAX(s.last_seen_at) AS period_last_seen,
