@@ -4,6 +4,8 @@ declare(strict_types=1);
 function adminActivitySnapshot(PDO $db, array $user, array $query): array
 {
     requireFamilyAdmin($user);
+    $days = familyReportingPeriod($query, true);
+    $bounds = familyReportingBounds($days);
     $types = sharedActivityTypes();
     $type = $query['type'] ?? '';
     $actor = $query['actor'] ?? '';
@@ -18,7 +20,8 @@ function adminActivitySnapshot(PDO $db, array $user, array $query): array
     }
     // This allowlist excludes private notes even if another feature accidentally logs them here.
     $where = 'a.entity_type IN (' . implode(',', array_fill(0, count($types), '?')) . ')';
-    $args = $types;
+    $where .= ' AND a.occurred_at >= ? AND a.occurred_at < ?';
+    $args = array_merge($types, [$bounds['since'], $bounds['until']]);
     foreach (['a.entity_type' => $type, 'a.actor_id' => $actor, 'a.id' => $before] as $field => $value) {
         if ($value !== '') {
             $where .= ' AND ' . $field . ($field === 'a.id' ? ' < ?' : ' = ?');
@@ -35,6 +38,7 @@ function adminActivitySnapshot(PDO $db, array $user, array $query): array
     $more = count($rows) > 50;
     $rows = array_slice($rows, 0, 50);
     return [
+        'days' => $days, 'from' => $bounds['from'], 'through' => $bounds['through'],
         'entries' => array_map(static fn(array $row): array => [
             'id' => (string) $row['id'], 'entityType' => $row['entity_type'],
             'entityId' => (string) $row['entity_id'], 'action' => $row['action'],

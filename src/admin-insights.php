@@ -17,9 +17,7 @@ function insightCounts(): array
 function adminInsightsSnapshot(PDO $db, array $user, array $query): array
 {
     requireFamilyAdmin($user);
-    $period = $query['days'] ?? '30';
-    if (!is_string($period) || !in_array($period, ['7','30','90'], true)) throw new HttpError(422, 'Choose a reporting period.');
-    $days = (int)$period;
+    $days = familyReportingPeriod($query);
     // One declared reporting zone keeps calendar days comparable across family devices.
     $window = familyReportingWindow($days);
     $zone = $window['zone'];

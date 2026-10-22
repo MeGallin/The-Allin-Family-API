@@ -79,25 +79,25 @@ function platformSessionView(array $row): array
 function adminUsageSnapshot(PDO $db, array $user, array $query): array
 {
     requireFamilyAdmin($user);
-    $days = $query['days'] ?? '30';
+    $days = familyReportingPeriod($query, true);
     $person = $query['user'] ?? '';
     $before = $query['before'] ?? '';
-    if (!is_string($days) || !in_array($days, ['7','30','90','0'], true)) throw new HttpError(422, 'Choose a usage period.');
     foreach ([$person,$before] as $value) {
         if (!is_string($value) || ($value !== '' && (!ctype_digit($value) || strlen($value) > 18 || (int)$value < 1))) {
             throw new HttpError(422, 'Choose a valid usage filter.');
         }
     }
-    $since = $days === '0' ? '1970-01-01 00:00:00' : familyReportingWindow((int)$days)['start']
-        ->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+    $bounds = familyReportingBounds($days);
+    $since = $bounds['since'];
+    $until = $bounds['until'];
     $statement = $db->prepare('SELECT u.id,u.username,u.display_name,u.nickname,u.is_active,
         COUNT(s.login_at) AS logins, COALESCE(SUM(s.active_seconds),0) AS seconds,
         MAX(s.last_seen_at) AS period_last_seen,
         (SELECT MAX(login_at) FROM platform_sessions WHERE user_id=u.id) AS last_login,
         (SELECT MAX(last_seen_at) FROM platform_sessions WHERE user_id=u.id) AS last_seen
-        FROM users u LEFT JOIN platform_sessions s ON s.user_id=u.id AND s.started_at >= ?
+        FROM users u LEFT JOIN platform_sessions s ON s.user_id=u.id AND s.started_at >= ? AND s.started_at < ?
         GROUP BY u.id,u.username,u.display_name,u.nickname,u.is_active ORDER BY u.display_name');
-    $statement->execute([$since]);
+    $statement->execute([$since, $until]);
     $people = array_map(static fn(array $row): array => [
         'id' => (int)$row['id'], 'name' => familyDisplayName($row), 'username' => $row['username'],
         'enabled' => (bool)$row['is_active'], 'logins' => (int)$row['logins'],
@@ -106,7 +106,7 @@ function adminUsageSnapshot(PDO $db, array $user, array $query): array
         'lastLoginAt' => $row['last_login'] === null ? null : activityTimestamp($row['last_login']),
         'lastSeenAt' => $row['last_seen'] === null ? null : activityTimestamp($row['last_seen']),
     ], $statement->fetchAll());
-    $where = 's.started_at >= ?'; $args = [$since];
+    $where = 's.started_at >= ? AND s.started_at < ?'; $args = [$since, $until];
     if ($person !== '') { $where .= ' AND s.user_id = ?'; $args[] = $person; }
     if ($before !== '') { $where .= ' AND s.id < ?'; $args[] = $before; }
     $statement = $db->prepare('SELECT s.*,u.display_name,u.nickname FROM platform_sessions s

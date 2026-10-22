@@ -448,3 +448,16 @@ Database connections explicitly set the session time zone to UTC. This keeps
 CURRENT_TIMESTAMP defaults (including account creation) aligned with explicit
 UTC audit/usage timestamps, avoiding future-looking join times on BST servers.
 Existing stored DATETIME values are not rewritten.
+
+## Shared reporting-period contract
+
+Overview insights, usage and shared activity use familyReportingPeriod and the
+Europe/London calendar window in src/reporting.php. Valid periods are 7, 30 and
+90 days (default 30); Usage and Activity additionally accept days=0 for all recorded
+history. Windows include today, begin at London midnight and end exclusively at
+next London midnight; UTC SQL bounds preserve daylight-saving transitions.
+GET /admin/activity now applies days alongside actor/type/before and returns days,
+from (null for all history), and through (London calendar dates). Existing shared
+entity allowlists exclude personal notes. Usage aggregate/session rows have both
+start and exclusive end bounds on started_at; lifetime last-login/seen fields and
+session-start cohort semantics remain unchanged. No migration or data rewrite.
