@@ -268,7 +268,7 @@ PHP INI syntax: double-quoted strings and semicolon comments. Process environmen
 variables override the file. Generate a private `APP_KEY` of at least 32 characters.
 
 For Trilogy, supply its MySQL settings, set `APP_ENV="production"`, set
-`APP_ORIGIN="https://theallinfamily.co.uk"` to the exact frontend origin and set
+`APP_ORIGIN="https://www.theallinfamily.co.uk"` to the exact frontend origin and set
 `SESSION_COOKIE_SECURE="1"`. Insecure cookies are accepted only on loopback in
 local/test mode. PHP needs Argon2id and `pdo_mysql`. Confirm the host provides a
 supported PHP version. Serve the frontend and API on the same origin.
