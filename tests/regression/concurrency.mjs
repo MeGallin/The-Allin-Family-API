@@ -34,7 +34,14 @@ export function concurrencyTests(get) {
                       footer: "",
                       noteDate: "2026-10-22",
                     }
-                  : { title, detail: "Original", options: ["A", "B"] };
+                  : {
+                      title,
+                      detail: "Original",
+                      closesAt: new Date(
+                        Date.now() + 4 * 3600000,
+                      ).toISOString(),
+                      options: ["A", "B"],
+                    };
         const pack = (body) =>
           domain === "memories" ? memoryForm(body) : body;
         const field = {
@@ -124,6 +131,7 @@ export function concurrencyTests(get) {
         await owner.request("/polls/add", {
           title: "Regression competing ballot",
           detail: "",
+          closesAt: new Date(Date.now() + 4 * 3600000).toISOString(),
           options: ["A", "B"],
           requestKey: key(),
         }),

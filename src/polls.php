@@ -33,19 +33,53 @@ function pollOptions(array $body): array
     return $labels;
 }
 
+/** Parse an explicit instant; local wall-clock strings are deliberately rejected. */
+function pollDeadline(mixed $value): string
+{
+    if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/D', $value)) {
+        throw new HttpError(422, 'Choose a valid closing date and time with a timezone.');
+    }
+    try {
+        $date = new DateTimeImmutable($value);
+        $errors = DateTimeImmutable::getLastErrors();
+        if ($errors && ($errors['warning_count'] || $errors['error_count'])) throw new RuntimeException('Invalid date');
+    } catch (Throwable $error) {
+        throw new HttpError(422, 'Choose a valid closing date and time.');
+    }
+    return $date->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.v\Z');
+}
+
+function pollDeadlineSql(string $value): string
+{
+    return (new DateTimeImmutable($value))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s.u');
+}
+
+function requireFuturePollDeadline(PDO $db, string $value): void
+{
+    $query = $db->prepare('SELECT ? > UTC_TIMESTAMP(6)');
+    $query->execute([pollDeadlineSql($value)]);
+    if (!(bool) $query->fetchColumn()) throw new HttpError(422, 'Choose a closing time in the future.');
+}
+
+function pollIsClosed(array $row): bool
+{
+    return (bool) $row['closed'] || (bool) $row['deadline_passed'];
+}
+
 function pollAudit(array $row): array
 {
-    return ['title' => $row['title'], 'detail' => $row['detail'], 'closed' => (bool) $row['closed']];
+    return ['title' => $row['title'], 'detail' => $row['detail'], 'closed' => pollIsClosed($row),
+        'closesAt' => activityTimestamp($row['closes_at'])];
 }
 
 function pollsSnapshot(PDO $db, array $user): array
 {
     $db->beginTransaction();
     try {
-        $polls = $db->query('SELECT p.*, c.display_name AS creator_name, c.nickname AS creator_nickname,
+        $polls = $db->query('SELECT p.*, (p.closes_at <= UTC_TIMESTAMP(6)) AS deadline_passed, c.display_name AS creator_name, c.nickname AS creator_nickname,
             u.display_name AS updater_name, u.nickname AS updater_nickname
             FROM polls p JOIN users c ON c.id = p.created_by JOIN users u ON u.id = p.updated_by
-            WHERE p.deleted_at IS NULL ORDER BY p.closed, p.created_at DESC, p.id DESC')->fetchAll();
+            WHERE p.deleted_at IS NULL ORDER BY (p.closed OR p.closes_at <= UTC_TIMESTAMP(6)), p.created_at DESC, p.id DESC')->fetchAll();
         $options = $db->query('SELECT o.id, o.poll_id, o.label, COUNT(v.user_id) AS votes
             FROM poll_options o JOIN polls p ON p.id = o.poll_id AND p.deleted_at IS NULL
             LEFT JOIN poll_votes v ON v.poll_id = o.poll_id AND v.option_id = o.id
@@ -84,7 +118,9 @@ function pollsSnapshot(PDO $db, array $user): array
 // Caller holds the poll row lock and the transaction containing the activity write.
 function savePollVote(PDO $db, array $user, array $poll, array $body): void
 {
-    if ($poll['closed']) throw new HttpError(409, 'Voting has closed for this poll.', 'poll_closed');
+    $clock = $db->prepare('SELECT ? <= UTC_TIMESTAMP(6)');
+    $clock->execute([$poll['closes_at']]);
+    if ($poll['closed'] || (bool) $clock->fetchColumn()) throw new HttpError(409, 'Voting has closed for this poll.', 'poll_closed');
     $query = $db->prepare('SELECT id, label FROM poll_options WHERE poll_id = ?');
     $query->execute([$poll['id']]);
     $labels = [];
@@ -116,16 +152,23 @@ function savePollDetails(PDO $db, array $user, array $poll, string $operation, a
         throw new HttpError(403, 'Only the poll creator or an administrator can manage this poll.', 'poll_manage_required');
     }
     $before = pollAudit($poll);
-    $after = $operation === 'edit' ? $draft + ['closed' => (bool) $poll['closed']]
-        : ($operation === 'close' ? ['title' => $poll['title'], 'detail' => $poll['detail'], 'closed' => $body['closed']] : null);
+    $reopen = ($body['reopen'] ?? false) === true;
+    if ($operation === 'edit') {
+        if ($draft['closesAt'] !== pollDeadline($before['closesAt']) || $reopen) requireFuturePollDeadline($db, $draft['closesAt']);
+        $after = array_replace($before, $draft, ['closed' => $reopen ? false : $before['closed']]);
+    } elseif ($operation === 'close') {
+        if (!$body['closed']) requireFuturePollDeadline($db, $before['closesAt']);
+        $after = $before;
+        $after['closed'] = $body['closed'];
+    } else $after = null;
     if ($operation !== 'remove' && $before === $after) return;
     $data = $after ?? $before;
     $deletedAt = $operation === 'remove' ? 'UTC_TIMESTAMP(6)' : 'NULL';
-    $db->prepare('UPDATE polls SET title = ?, detail = ?, closed = ?, updated_by = ?,
+    $db->prepare('UPDATE polls SET title = ?, detail = ?, closed = ?, closes_at = ?, updated_by = ?,
         updated_at = UTC_TIMESTAMP(6), version = version + 1, deleted_at = ' . $deletedAt . ' WHERE id = ?')
-        ->execute([$data['title'], $data['detail'], (int) $data['closed'], $user['id'], $poll['id']]);
+        ->execute([$data['title'], $data['detail'], (int) $data['closed'], pollDeadlineSql($data['closesAt']), $user['id'], $poll['id']]);
     recordActivity($db, $user, 'poll', (int) $poll['id'],
-        $operation === 'remove' ? 'removed' : ($operation === 'edit' ? 'edited' : ($body['closed'] ? 'closed' : 'reopened')),
+        $operation === 'remove' ? 'removed' : ($operation === 'edit' ? ($reopen && $before['closed'] ? 'reopened' : 'edited') : ($body['closed'] ? 'closed' : 'reopened')),
         $before, $after);
 }
 
@@ -133,7 +176,9 @@ function mutatePoll(PDO $db, array $user, string $operation, array $body): array
 {
     $draft = in_array($operation, ['add', 'edit'], true) ? [
         'title' => pollText($body, 'title', 160, true), 'detail' => pollText($body, 'detail', 1000, false),
+        'closesAt' => pollDeadline($body['closesAt'] ?? null),
     ] : null;
+    if (isset($body['reopen']) && !is_bool($body['reopen'])) throw new HttpError(422, 'Choose whether to reopen voting.');
     $choices = $operation === 'add' ? pollOptions($body) : [];
     if ($operation === 'add') {
         if (!isset($body['requestKey']) || !is_string($body['requestKey']) ||
@@ -157,9 +202,13 @@ function mutatePoll(PDO $db, array $user, string $operation, array $body): array
     try {
         if ($operation === 'add') {
             $key = hash('sha256', $user['id'] . ':' . $body['requestKey']);
-            $query = $db->prepare('INSERT INTO polls (title, detail, created_by, updated_by, created_at, updated_at, request_key)
-                VALUES (?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)');
-            $query->execute([$draft['title'], $draft['detail'], $user['id'], $user['id'], $key]);
+            // Retrying an already-saved addition remains safe even after its cutoff.
+            $existing = $db->prepare('SELECT id FROM polls WHERE request_key = ?');
+            $existing->execute([$key]);
+            if (!$existing->fetchColumn()) requireFuturePollDeadline($db, $draft['closesAt']);
+            $query = $db->prepare('INSERT INTO polls (title, detail, closes_at, created_by, updated_by, created_at, updated_at, request_key)
+                VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)');
+            $query->execute([$draft['title'], $draft['detail'], pollDeadlineSql($draft['closesAt']), $user['id'], $user['id'], $key]);
             $id = (int) $db->lastInsertId();
             if ($query->rowCount() === 1) {
                 $query = $db->prepare('INSERT INTO poll_options (poll_id, label, position) VALUES (?, ?, ?)');
@@ -168,7 +217,7 @@ function mutatePoll(PDO $db, array $user, string $operation, array $body): array
             }
         } else {
             // Serialise close/remove and voting; ballot revisions remain independent per person.
-            $query = $db->prepare('SELECT * FROM polls WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $query = $db->prepare('SELECT polls.*, (closes_at <= UTC_TIMESTAMP(6)) AS deadline_passed FROM polls WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
             $query->execute([$body['id']]);
             $poll = $query->fetch();
             if (!$poll) throw new HttpError(404, 'This poll is no longer available.', 'poll_unavailable');

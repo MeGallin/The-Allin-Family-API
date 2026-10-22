@@ -196,6 +196,7 @@ export function savingTests(get) {
         await owner.request("/polls/add", {
           title: "Regression question",
           detail: "Saved detail",
+          closesAt: new Date(Date.now() + 4 * 3600000).toISOString(),
           options: ["One", "Two"],
           requestKey: key(),
         }),

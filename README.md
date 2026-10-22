@@ -523,3 +523,12 @@ very large archives would require a separate server-pagination/search contract.
 ## Repeatable feature regression
 
 Run `node --test tests/regression.test.mjs` for real HTTP/database saving, ownership, permissions and competing-version checks. [tests/README.md](tests/README.md) documents the isolated fixture, commands, cleanup safeguards and recovery. The existing authentication suite remains `node tests/run-auth.mjs`. The client now owns a shared **20-second** delayed-removal/Undo policy; API mutations remain immediate when submitted.
+
+
+## Poll closing times (migration 015)
+
+Run bin/migrate.php --local for the isolated local installation; deployment requires applying 015_poll_deadlines.sql before the new client/API. polls.closes_at is a required UTC DATETIME(6). Legacy open polls receive a four-hour transition window from migration time; closed legacy polls retain closed status with a cutoff four hours after creation. No poll contents or votes are removed.
+
+Add/edit require closesAt as an explicit ISO timestamp with timezone. New or changed deadlines must be in the future, checked against database UTC time. An unchanged historical cutoff may be retained when editing a closed result. Reopening via edit requires reopen:true and a future closesAt. Ordinary edits preserve closed status. Creator/admin permission checks, versions, ballot conflict handling and idempotency remain in place; retrying an existing addition is still accepted after its deadline.
+
+GET snapshots return effective closed status (manual close OR deadline passed). Vote writes recheck the database clock after obtaining the poll lock, rejecting new votes, changes and withdrawals at/after cutoff. Expiry is computed from the stored timestamp and needs no cron worker or open browser. Scheduled expiry does not invent a human actor/activity row. Creation, edits and reopening record closesAt in existing before/after admin history with the session actor. Final vote totals remain available.

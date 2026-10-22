@@ -1,3 +1,4 @@
+import { deadlineTests } from "./regression/deadlines.mjs";
 import { isolationTests } from "./regression/isolation.mjs";
 import { before, after } from "node:test";
 import { startEnvironment } from "./support/environment.mjs";
@@ -18,3 +19,5 @@ privacyTests(current);
 permissionsTests(current);
 concurrencyTests(current);
 isolationTests(current);
+
+deadlineTests(current);

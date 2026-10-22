@@ -48,3 +48,6 @@ The cleanup script verifies the database marker against that token before removi
 ## What this proves
 
 Saving/reloading and server enforcement are exercised with a real database; competing stale revisions must yield one 200 and one 409, and stale deletes cannot remove the winner. Tests are sequential by default, with explicit Promise.all for competing sessions. This is not a multi-worker lock stress test. The 20-second wait and Undo are frontend policies tested with virtual timers against all five real Redux removal adapters; the API itself correctly processes a valid removal immediately when it arrives. No artificial 20-second server delay is added.
+
+
+Poll deadline coverage lives in regression/deadlines.mjs. It verifies required future timestamps, persistence, database-enforced expiry, late-vote/change/withdrawal rejection, reopening with retained votes, permissions, version conflicts and actor/deadline audit history. Existing poll payloads include closesAt. The short expiry case waits for a real two-second cutoff in the disposable regression database.

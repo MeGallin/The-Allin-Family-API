@@ -65,6 +65,7 @@ export function permissionsTests(get) {
       ok(
         await owner.request("/polls/add", {
           title: "Duplicate choices",
+          closesAt: new Date(Date.now() + 4 * 3600000).toISOString(),
           options: ["Same", "Same"],
           requestKey: key(),
         }),
@@ -121,6 +122,7 @@ export function permissionsTests(get) {
         await owner.request("/polls/add", {
           title: "Regression poll permission",
           detail: "Details",
+          closesAt: new Date(Date.now() + 4 * 3600000).toISOString(),
           options: ["A", "B"],
           requestKey: key(),
         }),
@@ -132,6 +134,7 @@ export function permissionsTests(get) {
           version: poll.version,
           title: "Attempted change",
           detail: "",
+          closesAt: poll.closesAt,
         }),
         403,
       );
