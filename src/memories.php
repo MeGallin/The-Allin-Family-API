@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . "/memory-photos.php";
 
 function memoryActor(array $row, string $prefix): array
 {
@@ -11,6 +12,26 @@ function memoryActor(array $row, string $prefix): array
 function memoryAudit(array $row): array
 {
     return ['title' => $row['title'], 'story' => $row['story'], 'photoKey' => $row['photo_key'], 'photoAlt' => $row['photo_alt']];
+}
+
+/** Family feeds need change flags, while exact old/new stories remain in admin audit history. */
+function memoryActivitySummary(array $row): array
+{
+    $before = $row['before_data'] === null ? null : json_decode($row['before_data'], true, 16, JSON_THROW_ON_ERROR);
+    $after = $row['after_data'] === null ? null : json_decode($row['after_data'], true, 16, JSON_THROW_ON_ERROR);
+    return [
+        'id' => (string)$row['id'], 'memoryId' => (string)$row['entity_id'], 'action' => $row['action'],
+        'actor' => ['id' => (int)$row['actor_id'], 'displayName' => familyDisplayName([
+            'display_name' => $row['current_name'] ?? $row['actor_name'], 'nickname' => $row['current_nickname'],
+        ])], 'occurredAt' => activityTimestamp($row['occurred_at']),
+        'before' => $before === null ? null : ['title' => $before['title'] ?? 'a memory'],
+        'after' => $after === null ? null : ['title' => $after['title'] ?? 'a memory'],
+        'changes' => [
+            'story' => ($before['story'] ?? '') !== ($after['story'] ?? ''),
+            'photo' => ($before['photoKey'] ?? null) !== ($after['photoKey'] ?? null),
+            'description' => ($before['photoAlt'] ?? '') !== ($after['photoAlt'] ?? ''),
+        ],
+    ];
 }
 
 function memoriesSnapshot(PDO $db, array $user): array
@@ -36,19 +57,14 @@ function memoriesSnapshot(PDO $db, array $user): array
     return [
         'memories' => array_map(static fn(array $row): array => [
             'id' => (string) $row['id'], 'title' => $row['title'], 'story' => $row['story'],
+            'photoWidth' => $row['photo_width'] === null ? null : (int)$row['photo_width'],
+            'photoHeight' => $row['photo_height'] === null ? null : (int)$row['photo_height'],
             'photoKey' => $row['photo_key'], 'photoAlt' => $row['photo_alt'], 'version' => (int) $row['version'],
             'createdBy' => memoryActor($row, 'created'), 'updatedBy' => memoryActor($row, 'updated'),
             'createdAt' => activityTimestamp($row['created_at']), 'updatedAt' => activityTimestamp($row['updated_at']),
             'reactions' => (int) $row['reactions'], 'liked' => (bool) $row['liked'],
         ], $rows),
-        'activity' => array_map(static fn(array $row): array => [
-            'id' => (string) $row['id'], 'memoryId' => (string) $row['entity_id'], 'action' => $row['action'],
-            'actor' => ['id' => (int) $row['actor_id'], 'displayName' => familyDisplayName([
-                'display_name' => $row['current_name'] ?? $row['actor_name'], 'nickname' => $row['current_nickname'],
-            ])], 'occurredAt' => activityTimestamp($row['occurred_at']),
-            'before' => $row['before_data'] === null ? null : json_decode($row['before_data'], true, 16, JSON_THROW_ON_ERROR),
-            'after' => $row['after_data'] === null ? null : json_decode($row['after_data'], true, 16, JSON_THROW_ON_ERROR),
-        ], $history),
+        'activity' => array_map('memoryActivitySummary', $history),
     ];
 }
 
@@ -95,36 +111,8 @@ function memoryUpload(): ?array
     if ($info[0] < 1 || $info[1] < 1 || $info[0] > 8192 || $info[1] > 8192 || $info[0] * $info[1] > 24000000) {
         throw new HttpError(422, 'Resize the photo to 24 megapixels or less, with no side longer than 8192 pixels.');
     }
-    return ['tmp' => $file['tmp_name'], 'mime' => $mime];
-}
-
-function memoryPhotoPath(array $config, string $key): string
-{
-    if (!preg_match('/^[a-f0-9]{64}$/D', $key)) throw new RuntimeException('Invalid stored photo key.');
-    if (trim($config['MEMORY_PHOTO_DIRECTORY']) === '') throw new RuntimeException('Configure private photo storage.');
-    return rtrim($config['MEMORY_PHOTO_DIRECTORY'], '/\\') . '/' . $key;
-}
-
-function serveMemoryPhoto(PDO $db, array $config): void
-{
-    $id = $_GET['id'] ?? '';
-    $key = $_GET['v'] ?? '';
-    if (!is_string($id) || !ctype_digit($id) || strlen($id) > 18 || !is_string($key)) throw new HttpError(404, 'Photo not found.');
-    $query = $db->prepare('SELECT photo_key, photo_mime FROM memories WHERE id = ? AND deleted_at IS NULL');
-    $query->execute([$id]);
-    $row = $query->fetch();
-    if (!$row || !$row['photo_key'] || !hash_equals($row['photo_key'], $key)) throw new HttpError(404, 'Photo not found.');
-    $path = memoryPhotoPath($config, $row['photo_key']);
-    $stream = @fopen($path, 'rb');
-    if ($stream === false) throw new HttpError(404, 'Photo unavailable.');
-    session_write_close();
-    header('Content-Type: ' . $row['photo_mime']);
-    header('Content-Disposition: inline; filename="family-photo"');
-    header('Cache-Control: private, no-store');
-    header('X-Content-Type-Options: nosniff');
-    header("Content-Security-Policy: default-src 'none'; sandbox");
-    fpassthru($stream);
-    fclose($stream);
+    $dimensions = memoryPhotoInfo($file['tmp_name'], $mime);
+    return ['tmp' => $file['tmp_name'], 'mime' => $mime, 'width' => $dimensions['width'] ?? $info[0], 'height' => $dimensions['height'] ?? $info[1]];
 }
 
 function mutateMemory(PDO $db, array $config, array $user, string $operation, array $body): array
@@ -168,11 +156,13 @@ function mutateMemory(PDO $db, array $config, array $user, string $operation, ar
         }
         $key = $old['photo_key'] ?? null;
         $mime = $old['photo_mime'] ?? null;
+        $photoWidth = $old['photo_width'] ?? null; $photoHeight = $old['photo_height'] ?? null;
         if ($draft) {
-            if ($body['removePhoto'] ?? false) { $key = null; $mime = null; }
+            if ($body['removePhoto'] ?? false) { $key = null; $mime = null; $photoWidth = null; $photoHeight = null; }
             if ($upload) {
                 $key = bin2hex(random_bytes(32));
                 $mime = $upload['mime'];
+                $photoWidth = $upload['width']; $photoHeight = $upload['height'];
             }
             if (!$key && $draft['story'] === '') throw new HttpError(422, 'Add a photo or write a story.');
             if ($upload) {
@@ -184,9 +174,9 @@ function mutateMemory(PDO $db, array $config, array $user, string $operation, ar
             }
         }
         if ($operation === 'add') {
-            $query = $db->prepare('INSERT INTO memories (title, story, photo_key, photo_mime, photo_alt, created_by, updated_by, created_at, updated_at, request_key)
-                VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?)');
-            $query->execute([$draft['title'], $draft['story'], $key, $mime, $draft['photoAlt'], $user['id'], $user['id'], $requestKey]);
+            $query = $db->prepare('INSERT INTO memories (title, story, photo_key, photo_mime, photo_width, photo_height, photo_alt, created_by, updated_by, created_at, updated_at, request_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?)');
+            $query->execute([$draft['title'], $draft['story'], $key, $mime, $photoWidth, $photoHeight, $draft['photoAlt'], $user['id'], $user['id'], $requestKey]);
             recordActivity($db, $user, 'memory', (int) $db->lastInsertId(), 'created', null, $draft + ['photoKey' => $key]);
         } elseif ($operation === 'react') {
             $query = $db->prepare($body['liked'] ? 'INSERT IGNORE INTO memory_reactions (memory_id, user_id, created_at) VALUES (?, ?, UTC_TIMESTAMP(6))' : 'DELETE FROM memory_reactions WHERE memory_id = ? AND user_id = ?');
@@ -197,9 +187,9 @@ function mutateMemory(PDO $db, array $config, array $user, string $operation, ar
             $after = $operation === 'remove' ? $before : $draft + ['photoKey' => $key];
             // Compare values independently of JSON/object property order.
             if ($operation === 'remove' || $before != $after) {
-                $db->prepare('UPDATE memories SET title = ?, story = ?, photo_key = ?, photo_mime = ?, photo_alt = ?, updated_by = ?, updated_at = UTC_TIMESTAMP(6), version = version + 1,
+                $db->prepare('UPDATE memories SET title = ?, story = ?, photo_key = ?, photo_mime = ?, photo_width = ?, photo_height = ?, photo_alt = ?, updated_by = ?, updated_at = UTC_TIMESTAMP(6), version = version + 1,
                     deleted_at = ' . ($operation === 'remove' ? 'UTC_TIMESTAMP(6)' : 'NULL') . ' WHERE id = ?')
-                    ->execute([$after['title'], $after['story'], $key, $mime, $after['photoAlt'], $user['id'], $old['id']]);
+                    ->execute([$after['title'], $after['story'], $key, $mime, $photoWidth, $photoHeight, $after['photoAlt'], $user['id'], $old['id']]);
                 recordActivity($db, $user, 'memory', (int) $old['id'], $operation === 'remove' ? 'removed' : 'edited', $before, $operation === 'remove' ? null : $after);
                 if ($old['photo_key'] !== $key) $oldKey = $old['photo_key'];
             }
@@ -215,6 +205,6 @@ function mutateMemory(PDO $db, array $config, array $user, string $operation, ar
         if ($operation === 'add' && $error instanceof PDOException && ($error->errorInfo[1] ?? null) === 1062) return memoriesSnapshot($db, $user);
         throw $error;
     }
-    if ($oldKey) @unlink(memoryPhotoPath($config, $oldKey));
+    if ($oldKey) removeMemoryPhoto($config, $oldKey);
     return memoriesSnapshot($db, $user);
 }

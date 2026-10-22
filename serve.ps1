@@ -15,7 +15,11 @@ if (-not (Test-Path -LiteralPath $PhpPath)) {
 
 Push-Location $PSScriptRoot
 try {
-    & $PhpPath -S "${BindAddress}:$Port" router.php
+    # Enable the installed image library for this app only; leave global php.ini unchanged.
+    $phpModules = & $PhpPath -m
+    $photoArguments = @('-d', 'memory_limit=512M')
+    if ($phpModules -notcontains 'gd') { $photoArguments += @('-d', 'extension=gd') }
+    & $PhpPath @photoArguments -S "${BindAddress}:$Port" router.php
     if ($LASTEXITCODE -ne 0) { throw 'The PHP development server stopped with an error.' }
 } finally {
     Pop-Location

@@ -203,11 +203,13 @@ references and actor metadata are recorded in the same database transaction.
 
 Photos are stored as original raster files in `MEMORY_PHOTO_DIRECTORY` (defaults
 to ignored `.local/memory-photos`). Files never have public static URLs: random
-storage keys map to authenticated, no-store image responses with nosniff headers.
+storage keys map to authenticated private image responses with nosniff headers.
+Photo cache entries must revalidate authentication; see the performance section below.
 Filenames supplied by the user are not used for storage. MIME type and image headers
 are validated server-side: JPG/PNG/WebP only, up to 10 MiB, 24 megapixels and 8192px
 per side. SVG, arbitrary files and unsupported phone formats are rejected. File
-validation uses PHP `fileinfo` and `getimagesize`; GD is not required. Originals are
+validation uses PHP `fileinfo` and `getimagesize`; GD is required for resized previews,
+with original delivery retained as a fallback. Originals are
 not resized or stripped of embedded metadata. Upload errors preserve the form draft.
 
 Configure writable private storage outside the public web root on hosting. If using
@@ -461,3 +463,59 @@ from (null for all history), and through (London calendar dates). Existing share
 entity allowlists exclude personal notes. Usage aggregate/session rows have both
 start and exclusive end bounds on started_at; lifetime last-login/seen fields and
 session-start cohort semantics remain unchanged. No migration or data rewrite.
+
+## Performance: media, conditional snapshots and larger collections
+
+Apply migration014_media_performance.sql before this increment. Locally:
+
+```powershell
+C:/xampp/php/php.exe bin/migrate.php --local
+C:/xampp/php/php.exe bin/optimise-photo-metadata.php
+C:/xampp/php/php.exe -d extension=gd -d memory_limit=512M bin/prepare-photo-previews.php
+./serve.ps1
+```
+
+Production migrations use appropriate deployment credentials; the web application
+account retains its existing SELECT/INSERT/UPDATE/DELETE permissions. The migration
+adds nullable oriented photo dimensions and an (entity_type,id) recent-history index.
+The metadata command fills missing dimensions in100-row batches without changing
+user text, authors, versions or timestamps. It is repeatable; missing files are
+reported without deleting their rows. Uploads store dimensions for new photos.
+
+The local serve script enables the installed GD extension and512MiB request memory
+for this app only, without editing global php.ini. Hosting should enable GD and
+EXIF, with enough memory for supported24-megapixel uploads. Private derivatives
+are generated at allowlisted widths160/480/960/1600, preserving aspect ratio and
+JPEG orientation, avoiding upscaling, preferring WebP with JPEG/PNG fallbacks.
+Memory estimates prevent unsafe decoding; encoder/storage failures retain original
+delivery. A derivative larger than its original is not sent. Originals are never
+resized or rewritten. First requests use locked atomic cache creation; the optional
+preparation command warms caches ahead of visits. Superseded image cleanup includes
+derivatives. Cache files/locks stay in private storage and Git-ignore boundaries.
+
+The existing photo endpoint accepts optional width; unrecognised sizes are404.
+Every request checks the active session, current memory and matching photo key
+before streaming or304. Responses use private,no-cache plus ETag: browser reuse
+requires authenticated revalidation, and no public static route is introduced.
+The no-width URL remains the original for the existing View full photo action.
+
+GET shopping/calendar/memories/polls/notes now return an authenticated ETag based on
+the domain's latest audit revision, account/profile revisions and current user.
+An unchanged conditional request returns304 before rebuilding the full snapshot.
+JSON still uses no-store; the React transport keeps only the last five allowlisted
+snapshot responses in session memory and clears them on sign-out/session reset.
+Normal content writes must keep recording their existing transactional audit event;
+maintenance that bypasses those writes must reload clients or revise the snapshot
+version. SQL edits without audit events are not part of this cache contract.
+
+Family memory activity now projects titles and story/photo/description change flags,
+instead of repeatedly transferring full historical stories. Full before/after audit
+records remain unchanged in the database and admin activity endpoint. Actual current
+stories remain available in full. Recent family history limits stay100 (private50).
+The new feature-history index supports both bounded feeds and revision lookups.
+
+Collection windows are client render windows, not server pagination: initial and
+changed snapshots still return the complete active collection so global filtering,
+counts, audit attribution and versioned writes retain their existing meaning.
+Conditional reads and route-scoped subscriptions reduce repeated transfer/work;
+very large archives would require a separate server-pagination/search contract.

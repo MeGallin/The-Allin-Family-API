@@ -7,6 +7,7 @@ require __DIR__ . '/src/bootstrap.php';
 require __DIR__ . '/src/database.php';
 require __DIR__ . '/src/auth.php';
 require __DIR__ . '/src/activity.php';
+require __DIR__ . '/src/snapshot-response.php';
 require __DIR__ . '/src/shopping.php';
 require __DIR__ . '/src/profiles.php';
 require __DIR__ . '/src/admin-members.php';
@@ -125,23 +126,27 @@ if ($path === '/admin/activity') {
 }
 if ($path === '/polls' || str_starts_with($path, '/polls/')) {
     $user = requireFamilyUser($db);
-    jsonResponse($path === '/polls' ? pollsSnapshot($db, $user) : mutatePoll($db, $user, substr($path, strlen('/polls/')), requestJson()));
+    if ($path === '/polls') familySnapshotResponse($db, $user, 'poll', fn() => pollsSnapshot($db, $user));
+    else jsonResponse(mutatePoll($db, $user, substr($path, strlen('/polls/')), requestJson()));
     exit;
 }
 if ($path === '/notes' || str_starts_with($path, '/notes/')) {
     $user = requireFamilyUser($db);
-    jsonResponse($path === '/notes' ? personalNotesSnapshot($db, $user) : mutatePersonalNote($db, $user, substr($path, strlen('/notes/')), requestJson(100000)));
+    if ($path === '/notes') familySnapshotResponse($db, $user, 'personal_note', fn() => personalNotesSnapshot($db, $user));
+    else jsonResponse(mutatePersonalNote($db, $user, substr($path, strlen('/notes/')), requestJson(100000)));
     exit;
 }
 if ($path === '/memories' || str_starts_with($path, '/memories/')) {
     $user = requireFamilyUser($db);
     if ($path === '/memories/photo') serveMemoryPhoto($db, $configuration);
-    else jsonResponse($path === '/memories' ? memoriesSnapshot($db, $user) : mutateMemory($db, $configuration, $user, substr($path, strlen('/memories/')), memoryRequest()));
+    elseif ($path === '/memories') familySnapshotResponse($db, $user, 'memory', fn() => memoriesSnapshot($db, $user));
+    else jsonResponse(mutateMemory($db, $configuration, $user, substr($path, strlen('/memories/')), memoryRequest()));
     exit;
 }
 if ($path === '/calendar' || str_starts_with($path, '/calendar/')) {
     $user = requireFamilyUser($db);
-    jsonResponse($path === '/calendar' ? calendarSnapshot($db) : mutateCalendar($db, $user, substr($path, strlen('/calendar/')), requestJson()));
+    if ($path === '/calendar') familySnapshotResponse($db, $user, 'calendar_event', fn() => calendarSnapshot($db));
+    else jsonResponse(mutateCalendar($db, $user, substr($path, strlen('/calendar/')), requestJson()));
     exit;
 }
 if ($path === '/admin/members' || str_starts_with($path, '/admin/members/')) {
@@ -160,7 +165,8 @@ if (in_array($path, ['/profile', '/profile/nickname', '/admin/users', '/admin/us
 }
 if ($path === '/shopping' || str_starts_with($path, '/shopping/')) {
     $user = requireFamilyUser($db);
-    jsonResponse($path === '/shopping' ? shoppingSnapshot($db) : mutateShopping($db, $user, substr($path, strlen('/shopping/')), requestJson()));
+    if ($path === '/shopping') familySnapshotResponse($db, $user, 'shopping_item', fn() => shoppingSnapshot($db));
+    else jsonResponse(mutateShopping($db, $user, substr($path, strlen('/shopping/')), requestJson()));
     exit;
 }
 if ($path === '/auth/session') jsonResponse(sessionResponse(currentFamilyUser($db)));
