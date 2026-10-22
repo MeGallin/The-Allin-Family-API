@@ -575,3 +575,128 @@ Run bin/migrate.php --local for the isolated local installation; deployment requ
 Add/edit require closesAt as an explicit ISO timestamp with timezone. New or changed deadlines must be in the future, checked against database UTC time. An unchanged historical cutoff may be retained when editing a closed result. Reopening via edit requires reopen:true and a future closesAt. Ordinary edits preserve closed status. Creator/admin permission checks, versions, ballot conflict handling and idempotency remain in place; retrying an existing addition is still accepted after its deadline.
 
 GET snapshots return effective closed status (manual close OR deadline passed). Vote writes recheck the database clock after obtaining the poll lock, rejecting new votes, changes and withdrawals at/after cutoff. Expiry is computed from the stored timestamp and needs no cron worker or open browser. Scheduled expiry does not invent a human actor/activity row. Creation, edits and reopening record closesAt in existing before/after admin history with the session actor. Final vote totals remain available.
+
+## Manual cPanel/phpMyAdmin database release (no SSH)
+
+This is an explicitly approved manual alternative to the automated procedure in
+[DATABASE-RELEASE.md](DATABASE-RELEASE.md). It does not run the CLI's lock/checksum
+state machine. Do not claim CLI verification, create a public migration endpoint,
+import the development database into live, or grant schema permissions to the
+runtime app user. Prefer additive migrations compatible with the previous runtime.
+
+### Procedure used on 22 October 2026 for migration 016
+
+1. **Prepare and test locally.** Commit the client/API and run the regression,
+   authentication, database-release, build, formatting and PHP syntax checks.
+   This release used client `05e1058` and API `f44d409`.
+2. **Enable maintenance before taking backups.** In cPanel File Manager, use the
+   account-relative location `private/allin-family/database-releases` (the absolute
+   server location is `/home/theallinfamilyco/private/allin-family/database-releases`).
+   Confirm no existing maintenance release is in progress. Create `maintenance.json`
+   with **+ File**. This API checks file existence, so an empty file is sufficient.
+   Confirm `/api/health` reports code `maintenance`; all API routes are paused before
+   authentication, database and usage writes. Let existing requests finish before
+   taking the backup; check the paused snapshot against live again before migration.
+   This manual process does not acquire the CLI's exclusive request lease.
+3. **Download both backups.** cPanel **Tools > Backup > Partial Backups**:
+   - Under **Download a Database Backup**, click `theallinfamilyco_family_app`.
+   - Under **Download a Home Directory Backup**, click **Home Directory**.
+   - Successful downloads were `theallinfamilyco_family_app.sql.gz` (5,160 bytes)
+     and `backup-theallinfamily.co.uk-10-22-2026.tar.gz` (284,923,790 bytes).
+   - Copy into private, Git-ignored local recovery storage, never an upload package:
+     `api/.local/production-releases/20261022-week-ahead/`, as `before.sql.gz` and
+     `home-before.tar.gz`. Keep them protected: the SQL includes account hashes and
+     private data, and the home archive includes the production `.env`.
+4. **Verify downloaded files.** Calculate SHA256 for both originals; decompress
+   the SQL successfully (27,710 bytes) and list the complete home archive (4,146
+   entries). Confirm it contains `public_html/api/.env`, the current application,
+   and `private/allin-family/photos/` including originals and previews. The archive
+   also contains the maintenance marker; any later restore therefore needs an
+   explicit maintenance/recovery review. Check the SQL contains no `USE` or
+   `CREATE DATABASE` directive before importing into a differently named database.
+5. **Create a separate empty restore target.** cPanel **Manage My Databases >
+   Create New Database**, enter `family_app_restore`, yielding
+   `theallinfamilyco_family_app_restore`. Do not assign the runtime app user.
+   Open phpMyAdmin from cPanel; select that exact scratch database and confirm
+   **No tables found**. Never import a backup over the live database to test it.
+6. **Restore and verify.** In scratch **Import**, choose `before.sql.gz`, UTF-8/SQL,
+   and click **Import**. This backup restored successfully with 153 queries.
+   Through the SQL tab, compare every source/restored row using primary-key joins
+   (including composite keys) and NULL-safe equality for every column; compare
+   both directions so missing/extra rows are caught. Compare information_schema
+   columns, index definitions, table constraints, engines and collations as well.
+   All 14 original tables matched, with zero mismatched/extra rows and zero
+   metadata differences. Counts alone are not sufficient verification.
+7. **Rehearse the exact migration in scratch.** Explicitly target
+   `USE theallinfamilyco_family_app_restore;`, run the reviewed
+   `migrations/016_week_preferences.sql`, then record its exact filename in
+   `schema_migrations` only after successful DDL. Confirm 16 migration rows, an empty
+   `user_week_preferences`, primary key `user_id`, and its foreign key to `users.id`.
+   This migration creates only a new table and changes no existing family records.
+8. **Apply to live while maintenance stays enabled.** Select the live database,
+   open **SQL**, clear the editor and explicitly target
+   `USE theallinfamilyco_family_app;`. Execute the same reviewed migration and its
+   history insertion. Confirm no SQL errors and verify the new table/history.
+   Compare all original rows with the restored snapshot again, along with the
+   rehearsed schema. The new ledger row's `applied_at` timestamps legitimately
+   differ between rehearsal and live; compare that row's name while retaining
+   exact timestamp comparisons for older history. All original records matched,
+   both schemas matched, and both new preferences tables were empty.
+9. **Upload matching runtime files under maintenance.** Run `npm run build:deploy`
+   from the client. In FileZilla, verify local
+   `C:\xampp\htdocs\WebSitesDesigns\live\theallinfamily\` and remote `/public_html`.
+   Upload the package contents (`assets`, `api`, `.htaccess`, `index.html`) without
+   remote mirroring/deletion. Preserve the remote `api/.env`, private photos,
+   sessions, release storage and unrelated sub-sites. Do not upload SQL, backups,
+   CLI tools, `.git`, tests or development credentials. Check the queue is empty,
+   failed transfers are zero, and uploaded bytes match the built package.
+10. **Resume and smoke-test.** After all checks, rename the private maintenance
+    marker to a dated completed-release filename (reversible) and confirm API
+    health recovers. Clear the hosting frontend cache if it still serves the old
+    entry point. Test live under Gary/Dad on desktop/mobile: profile preferences,
+    weather details, holidays, 4–360-day scrolling, refresh, date-prefilled event
+    creation, navigation and browser errors. Avoid generating family content;
+    document any actual test changes and their cleanup. Keep restore data private;
+    removing the scratch database requires explicit, reviewed cleanup.
+
+### Evidence and recovery
+
+- **Completed release result (22 October 2026):** migration016 was applied only
+  after the successful scratch restore/rehearsal and original-data comparisons.
+  FileZilla completed all 117 files with an empty queue and no failed transfers.
+  SHA256 checks matched all 93 public client files, all 23 API package files and the
+  root routing file. The remote production `.env` matched its pre-release backup
+  byte-for-byte. The maintenance marker was renamed to
+  `maintenance-completed-20261022-week-ahead.json`; health returned 200.
+- Live checks passed under Gary/Dad: saved Scotland/refresh/regional holiday
+  changes, restored/saved England and Wales and refreshed; Guildford forecast;
+  360-day end boundary and 16 October 2027 event-form date (cancelled, no event
+  created); mobile 382px document/382px scroll width, four-day minimum, weather
+  dialog keyboard opening and Escape focus restoration. Admin displays Dad and
+  the correct Scotland-to-England-and-Wales before/after values. The two genuine
+  preference QA audit entries remain; no family test content was created.
+- A final binary-safe comparison (`BINARY a.column <=> BINARY b.column`) also
+  verified every preserved account/family-content value against scratch, with
+  zero mismatches or extra/missing rows. This avoids case-insensitive collation
+  hiding a changed string. Exclude legitimately changing usage/rate-limit/audit
+  tables from this final post-smoke comparison; they were compared under
+  maintenance before reopening. Retain the reviewed new-ledger timestamp exception.
+- Anonymous checks passed: health/session 200, private Notes/admin/photo 401,
+  environment/source 403 and secure HttpOnly/SameSite cookies. Browser warning/error
+  logs were empty. Existing live Gary session was retained; no password was read,
+  reset or changed. Local Home was restored and live Home left open.
+- The restore-verification database is retained as a private recovery copy with
+  no runtime-user assignment; do not reconnect the application to it. Archive
+  downloads also remain in Downloads and in the protected local backup directory.
+- Private local backups and comparison SQL live under
+  `api/.local/production-releases/20261022-week-ahead/` (Git ignored).
+- Non-secret release inventory, comparison results and screenshots live in the
+  shared workspace `work/hosting/week-ahead-release-20261022/`.
+- If backup, restore, migration or preservation checks fail, stop with maintenance
+  active. Never blindly retry partial DDL or restore production. Inspect the saved
+  state, then agree a forward repair or an explicitly authorised restore of the
+  matching database, application, configuration and photos. Restoring a database
+  can discard later writes; it is not a routine deployment step.
+- The database backups and home archive contain sensitive information. Do not put
+  their contents, credentials, cPanel session URLs or private keys in this README,
+  chat, Git or the public website.
