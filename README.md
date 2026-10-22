@@ -3,6 +3,44 @@
 PHP and MySQL API for the separate React client. Account creation and password
 resets are administrator CLI actions. There is no public registration endpoint.
 
+## Week Ahead weather and bank holidays
+
+The authenticated `GET /week-context` endpoint supplies optional public context;
+it never sends family events, account details or notes to external providers.
+No API keys or seed data are needed. Migration `016_week_preferences.sql` adds
+the per-account `user_week_preferences` table. In Your profile, each person can
+search/select a town, select a UK holiday region, or switch either feed off.
+Guildford, Surrey and England and Wales apply until that person saves a choice.
+Town search uses Open-Meteo/GeoNames town centres, not a street address or GPS.
+Forecasts use the selected town's time zone, displayed in forecast details.
+
+GET/POST `/profile/week-preferences` access only the session user's row; the
+browser cannot supply an owner ID. Updates use optimistic versions and record
+the actor, town label and region in the existing admin activity log. Full
+coordinates are not exposed to other profiles or recorded in the activity log.
+`GET /week-context/towns?q=...` returns signed, expiring choices tied to the
+current user, so a save cannot invent coordinates or substitute an arbitrary URL.
+Location search is explicit (no request on every keystroke), cached and throttled.
+
+PHP cURL with working CA certificates and verified outbound HTTPS is required.
+Weather comes from Open-Meteo (free non-commercial service; attribution displayed)
+and bank holidays from GOV.UK. Daily weather is in Celsius and the town's local time.
+Only fixed provider hosts are used; request parameters cannot supply a URL.
+
+The private cache defaults to `dirname(SESSION_DIRECTORY)/week-context`, or set
+`WEEK_CONTEXT_DIRECTORY` to a PHP-writable directory **outside public_html**.
+Weather refreshes after 30 minutes; holidays after 24 hours. Concurrent refreshes
+use a non-blocking lock; failures back off for five minutes. Saved forecasts are
+usable for at most six hours and holiday dates for seven days, with stale labels.
+Each provider has a four-second timeout, HTTPS certificate verification, bounded
+response size and validated response fields. Either provider can fail independently.
+
+Deploy the new additive migration using the separate verified-backup database
+release workflow before deploying both the API runtime and client. Retain the
+production `.env`, database and private storage. Only WEEK_CONTEXT_DIRECTORY may
+need server configuration; town/region choices are in the database. Deployment
+packages deliberately exclude the active configuration and migrations.
+
 ## Existing local installation
 
 From this API repository, in PowerShell:

@@ -27,6 +27,7 @@ function loadConfiguration(string $path): array
         'DB_PASSWORD' => '',
         'DATABASE_RELEASE_DIRECTORY' => '',
         'MEMORY_PHOTO_DIRECTORY' => dirname(__DIR__) . '/.local/memory-photos',
+        'WEEK_CONTEXT_DIRECTORY' => '',
     ];
 
     foreach ($defaults as $key => $default) {

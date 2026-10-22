@@ -20,6 +20,8 @@ require __DIR__ . '/src/admin-activity.php';
 require __DIR__ . '/src/usage.php';
 require __DIR__ . '/src/reporting.php';
 require __DIR__ . '/src/admin-insights.php';
+require __DIR__ . '/src/week-context.php';
+require __DIR__ . '/src/week-preferences.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -67,6 +69,8 @@ $routes = [
     '/admin/activity' => ['GET'],
     '/auth/presence' => ['POST'], '/admin/usage' => ['GET'],
     '/admin/insights' => ['GET'],
+    '/week-context' => ['GET'],
+    '/profile/week-preferences' => ['GET', 'POST'], '/week-context/towns' => ['GET'],
 ];
 if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', $routes[$path], true)) {
@@ -121,6 +125,30 @@ if ($path === '/admin/usage') {
 if ($path === '/admin/insights') {
     $user = requireFamilyUser($db);
     jsonResponse(adminInsightsSnapshot($db, $user, $_GET));
+    exit;
+}
+if ($path === '/week-context') {
+    $user = requireFamilyUser($db);
+    $preferences = weekPreferenceRecord($db, $user);
+    // Slow external providers must not hold the user's session lock.
+    session_write_close();
+    jsonResponse(weekContextSnapshot($configuration, $preferences));
+    exit;
+}
+if ($path === '/profile/week-preferences') {
+    $user = requireFamilyUser($db);
+    jsonResponse(($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+        ? saveWeekPreferences($db, $configuration, $user, requestJson())
+        : weekPublicPreferences(weekPreferenceRecord($db, $user)));
+    exit;
+}
+if ($path === '/week-context/towns') {
+    $user = requireFamilyUser($db);
+    $term = $_GET['q'] ?? '';
+    if (time() - (int)($_SESSION['town_search_at'] ?? 0) < 2) throw new HttpError(429, 'Please wait a moment before searching again.');
+    $_SESSION['town_search_at'] = time();
+    session_write_close();
+    jsonResponse(weekTownSearch($configuration, $user, $term));
     exit;
 }
 if ($path === '/admin/activity') {
