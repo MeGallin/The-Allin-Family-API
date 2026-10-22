@@ -1,0 +1,20 @@
+import { isolationTests } from "./regression/isolation.mjs";
+import { before, after } from "node:test";
+import { startEnvironment } from "./support/environment.mjs";
+import { savingTests } from "./regression/saving.mjs";
+import { privacyTests } from "./regression/privacy.mjs";
+import { permissionsTests } from "./regression/permissions.mjs";
+import { concurrencyTests } from "./regression/concurrency.mjs";
+let environment;
+before(async () => {
+  environment = await startEnvironment();
+});
+after(async () => {
+  await environment?.stop();
+});
+const current = () => environment;
+savingTests(current);
+privacyTests(current);
+permissionsTests(current);
+concurrencyTests(current);
+isolationTests(current);

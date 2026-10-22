@@ -331,7 +331,7 @@ can close/reopen voting. /polls/remove sets deleted_at. These three operations a
 creator/admin only and require the latest poll version. Closed/removed polls reject
 new votes. Choices are immutable so edits never silently reinterpret existing
 votes. Soft removal retains ballots and the activity history. Client record removal
-uses the common 30-second countdown/Undo; the API applies the final authorised,
+uses the common 20-second countdown/Undo; the API applies the final authorised,
 version-protected request after the delay.
 
 Poll creates/edits/close/reopen/removals and votes/changes/withdrawals write actor,
@@ -519,3 +519,7 @@ changed snapshots still return the complete active collection so global filterin
 counts, audit attribution and versioned writes retain their existing meaning.
 Conditional reads and route-scoped subscriptions reduce repeated transfer/work;
 very large archives would require a separate server-pagination/search contract.
+
+## Repeatable feature regression
+
+Run `node --test tests/regression.test.mjs` for real HTTP/database saving, ownership, permissions and competing-version checks. [tests/README.md](tests/README.md) documents the isolated fixture, commands, cleanup safeguards and recovery. The existing authentication suite remains `node tests/run-auth.mjs`. The client now owns a shared **20-second** delayed-removal/Undo policy; API mutations remain immediate when submitted.
