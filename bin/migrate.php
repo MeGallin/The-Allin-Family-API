@@ -3,6 +3,9 @@ declare(strict_types=1);
 require __DIR__ . '/common.php';
 $root = dirname(__DIR__);
 $config = loadConfiguration($root . '/.env');
+if (!in_array($config['APP_ENV'], ['local', 'test'], true)) {
+    throw new RuntimeException('Production migrations require bin/database-release.php and its verified backup workflow.');
+}
 if (isset(getopt('', ['local'])['local'])) {
     if ($config['APP_ENV'] !== 'local' || $config['DB_HOST'] !== '127.0.0.1' || $config['DB_PORT'] !== '3307') {
         throw new RuntimeException('Local migration credentials can only be used for the isolated local instance.');

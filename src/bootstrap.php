@@ -25,6 +25,7 @@ function loadConfiguration(string $path): array
         'DB_NAME' => 'theallinfamily',
         'DB_USER' => '',
         'DB_PASSWORD' => '',
+        'DATABASE_RELEASE_DIRECTORY' => '',
         'MEMORY_PHOTO_DIRECTORY' => dirname(__DIR__) . '/.local/memory-photos',
     ];
 

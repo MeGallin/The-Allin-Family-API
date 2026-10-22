@@ -51,3 +51,26 @@ Saving/reloading and server enforcement are exercised with a real database; comp
 
 
 Poll deadline coverage lives in regression/deadlines.mjs. It verifies required future timestamps, persistence, database-enforced expiry, late-vote/change/withdrawal rejection, reopening with retained votes, permissions, version conflicts and actor/deadline audit history. Existing poll payloads include closesAt. The short expiry case waits for a real two-second cutoff in the disposable regression database.
+
+## Database-release safeguards
+
+Run `node tests/run-database-release.mjs` here, or `npm run test:database-release`
+from the client. It is included in test:all. Windows defaults to the existing
+XAMPP PHP binary; override PHP_BINARY as needed. The suite requires the configured
+local127.0.0.1:3307 environment and reads the ignored local administrator settings.
+It creates random synthetic databases named allin_release_test_<token>, private
+fixture files, loopback HTTP/CLI workers and guarded restore-verification databases.
+No real local family database or production database is opened.
+
+It exercises real dump/restore/data comparisons, version/checksum/target guards,
+locks, SQL failures after earlier DDL, preservation checks, backup corruption,
+request draining/timeouts, HTTP503 before auth/analytics writes, real CLI
+plan/apply/resume and the cPanel precreated-empty restore mode. Database utility
+paths currently point to the installed local XAMPP tools. Fixtures contain synthetic
+accounts/content only, never cloned real accounts. Normal failures clean owned
+databases/private files. After a hard OS/process crash, inspect the exact private
+release-tests-<token> fixture and restore-scratch.json ownership records before
+manual recovery; never delete databases by prefix alone.
+
+See [DATABASE-RELEASE.md](../DATABASE-RELEASE.md) for the operator workflow,
+hosting prerequisites and intentionally manual production restore procedure.

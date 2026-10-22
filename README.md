@@ -290,8 +290,13 @@ C:/xampp/php/php.exe bin/migrate.php --local
 ```
 
 On hosting, supply migration credentials through the process environment when
-running `bin/migrate.php`, then use the restricted runtime credentials for web
-requests. Back up the database before applying future schema changes.
+running deployment tools, then use the restricted runtime credentials for web
+requests. Production `bin/migrate.php` is now blocked: use the separate private
+`bin/database-release.php` workflow described in [DATABASE-RELEASE.md](DATABASE-RELEASE.md).
+It requires an explicit target/reviewed plan, maintenance, a fresh database/files
+backup and a successful scratch restore before applying pending SQL. It leaves
+maintenance enabled for verification and explicit resume. Hosting prerequisites
+must be checked before first use; app packaging does not include/run this tool.
 
 ## Verification
 

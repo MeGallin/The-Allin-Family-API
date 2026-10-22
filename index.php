@@ -5,6 +5,7 @@ ini_set('display_errors', '0');
 ini_set('zend.exception_ignore_args', '1');
 require __DIR__ . '/src/bootstrap.php';
 require __DIR__ . '/src/database.php';
+require __DIR__ . '/src/release-maintenance.php';
 require __DIR__ . '/src/auth.php';
 require __DIR__ . '/src/activity.php';
 require __DIR__ . '/src/snapshot-response.php';
@@ -22,6 +23,7 @@ require __DIR__ . '/src/admin-insights.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
+        if ($error->status === 503) header('Retry-After: 60');
         jsonResponse(['error' => $error->getMessage(), 'code' => $error->errorCode], $error->status);
     } else {
         error_log(get_class($error) . ': ' . $error->getMessage());
@@ -30,6 +32,8 @@ set_exception_handler(static function (Throwable $error): void {
 });
 
 $configuration = loadConfiguration(__DIR__ . '/.env');
+// Must precede health, authentication, sessions and every database operation.
+$requestLease = acquireFamilyRequestLease($configuration);
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 if (!is_string($path)) {
     jsonResponse(['error' => 'Invalid request path.'], 400);

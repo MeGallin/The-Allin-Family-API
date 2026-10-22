@@ -6,6 +6,21 @@ require_once dirname(__DIR__) . '/src/bootstrap.php';
 require_once dirname(__DIR__) . '/src/database.php';
 require_once dirname(__DIR__) . '/src/auth.php';
 
+function executeMigrationSql(PDO $db, string $sql): void
+{
+    // PDO::exec can miss errors in later statements of a MySQL batch.
+    // Consume every result set before recording the migration as successful.
+    $previous = $db->getAttribute(PDO::ATTR_EMULATE_PREPARES);
+    $db->setAttribute(PDO::ATTR_EMULATE_PREPARES, true);
+    try {
+        $statement = $db->query($sql);
+        while ($statement->nextRowset()) { /* Advance through all SQL outcomes. */ }
+        $statement->closeCursor();
+    } finally {
+        $db->setAttribute(PDO::ATTR_EMULATE_PREPARES, $previous);
+    }
+}
+
 function runMigrations(PDO $db): void
 {
     $db->exec('CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -16,7 +31,7 @@ function runMigrations(PDO $db): void
         $query = $db->prepare('SELECT COUNT(*) FROM schema_migrations WHERE name = ?');
         $query->execute([$name]);
         if ((int) $query->fetchColumn() !== 0) continue;
-        $db->exec(file_get_contents($file));
+        executeMigrationSql($db, file_get_contents($file));
         $db->prepare('INSERT INTO schema_migrations (name) VALUES (?)')->execute([$name]);
         echo 'Applied migration: ' . $name . PHP_EOL;
     }
