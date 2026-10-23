@@ -24,6 +24,7 @@ require __DIR__ . '/src/week-context.php';
 require __DIR__ . '/src/week-preferences.php';
 require __DIR__ . '/src/food-alerts.php';
 require __DIR__ . '/src/weather-warnings.php';
+require __DIR__ . '/src/travel.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -74,6 +75,7 @@ $routes = [
     '/week-context' => ['GET'],
     '/food-alerts' => ['GET'],
     '/weather-warnings' => ['GET'],
+    '/travel' => ['GET'], '/profile/travel-preferences' => ['GET', 'POST'],
     '/profile/week-preferences' => ['GET', 'POST'], '/week-context/towns' => ['GET'],
 ];
 if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
@@ -135,6 +137,19 @@ if ($path === '/food-alerts') {
     requireFamilyUser($db);
     session_write_close();
     jsonResponse(foodAlertsSnapshot($configuration));
+    exit;
+}
+if ($path === '/profile/travel-preferences') {
+    $user = requireFamilyUser($db);
+    jsonResponse($_SERVER['REQUEST_METHOD'] === 'POST'
+        ? saveTravelPreferences($db, $user, requestJson()) : travelPreferences($db, $user));
+    exit;
+}
+if ($path === '/travel') {
+    $user = requireFamilyUser($db);
+    $preferences = travelPreferences($db, $user);
+    session_write_close();
+    jsonResponse(travelSnapshot($configuration, $preferences));
     exit;
 }
 if ($path === '/weather-warnings') {
