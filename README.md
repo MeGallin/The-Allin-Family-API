@@ -1,5 +1,10 @@
 # The Allin Family - API
 
+Encrypted nightly database/photo backups and the signed-in laptop OneDrive
+collector are active. A real isolated restore passed 15 tables and 12 photo files
+without replacing live data. Exact installation, schedules, recovery steps and
+limitations are documented in [ROUTINE-BACKUPS.md](ROUTINE-BACKUPS.md).
+
 PHP and MySQL API for the separate React client. Account creation and password
 resets are administrator CLI actions. There is no public registration endpoint.
 

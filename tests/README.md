@@ -74,3 +74,15 @@ manual recovery; never delete databases by prefix alone.
 
 See [DATABASE-RELEASE.md](../DATABASE-RELEASE.md) for the operator workflow,
 hosting prerequisites and intentionally manual production restore procedure.
+
+## Routine backup coverage
+
+Run `node tests/run-routine-backup.mjs` from the API directory for encryption,
+external-dump and PDO-export restore checks (71 checks in the last recorded run).
+Run `pwsh -NoProfile -File tests/backup-collector.ps1` for 24 collector checks.
+These use synthetic local fixtures, with the same guarded local database boundary
+described above; they do not run the installed production capture or collector.
+The collector tests simulate transport rather than using the saved FTPS credential.
+
+See [ROUTINE-BACKUPS.md](../ROUTINE-BACKUPS.md) for the separate real restore
+evidence, installed schedules, recovery steps and operational limitations.
