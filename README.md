@@ -737,3 +737,17 @@ runtime app user. Prefer additive migrations compatible with the previous runtim
 - The database backups and home archive contain sensitive information. Do not put
   their contents, credentials, cPanel session URLs or private keys in this README,
   chat, Git or the public website.
+
+## Public Met Office weather warnings
+
+Authenticated `GET /weather-warnings` reads the existing user's saved week preferences, closes the session before network work, and returns `{status, updatedAt, location, data}`. It performs no database writes and requires no migration or API key. A missing town (weather switched off) or non-UK location returns `unconfigured`.
+
+`src/weather-warnings.php` reads the official UK RSS feed at `https://www.metoffice.gov.uk/public/data/PWSCache/WarningsRSS/Region/UK`. The shared public-feed transport enforces HTTPS/TLS verification, bounded connection/total timeouts and a 1 MiB response limit, without following redirects. XML rejects DOCTYPE/entities and external network resolution. Unknown notice formats fail visibly rather than silently reporting no warnings. Official URLs are validated and retained; enclosure URLs are never fetched.
+
+One private shared national cache is refreshed after five minutes, with the existing lock/backoff and a maximum 15-minute stale window. The user's town is not sent to the Met Office. Filtering is applied per authenticated request, matching normalised town/county names to named warning areas and deduplicating warning IDs across regions. This is an area-name match, not a polygon/location guarantee; the client explains that exact coverage must be checked on the official map. Expired notices are removed, severity is ordered red/amber/yellow, and UTC RSS validity becomes UK calendar dates with an exclusive end boundary. The client displays local BST/GMT times beside the original summary and official advice link.
+
+Deploy with the accompanying client change. No production upload, migration or data change was performed during implementation. PHP lint and a read-only real Guildford feed snapshot passed; local browser checks confirmed the matched Surrey wind warning and correct BST conversion. No automated regression suite was run in this request.
+
+### Warning release review — 23 October 2026
+
+Normalisation trims punctuation before the Greater London alias comparison. Added CLI-only `tests/weather-warnings-unit.php`: 14 checks cover UTC/UK day boundaries, New Year rollover, coverage names, empty feeds, malformed dates/intervals, untrusted URLs, unsafe XML and size limits. Existing public-feed (7) and FSA (34) isolated checks also pass. These checks perform no external requests or database writes. Changed PHP files pass syntax validation. Release both packages together; upload src dependencies before the API entry point. No schema or production configuration change is required.

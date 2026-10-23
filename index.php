@@ -23,6 +23,7 @@ require __DIR__ . '/src/admin-insights.php';
 require __DIR__ . '/src/week-context.php';
 require __DIR__ . '/src/week-preferences.php';
 require __DIR__ . '/src/food-alerts.php';
+require __DIR__ . '/src/weather-warnings.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -72,6 +73,7 @@ $routes = [
     '/admin/insights' => ['GET'],
     '/week-context' => ['GET'],
     '/food-alerts' => ['GET'],
+    '/weather-warnings' => ['GET'],
     '/profile/week-preferences' => ['GET', 'POST'], '/week-context/towns' => ['GET'],
 ];
 if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
@@ -133,6 +135,13 @@ if ($path === '/food-alerts') {
     requireFamilyUser($db);
     session_write_close();
     jsonResponse(foodAlertsSnapshot($configuration));
+    exit;
+}
+if ($path === '/weather-warnings') {
+    $user = requireFamilyUser($db);
+    $preferences = weekPreferenceRecord($db, $user);
+    session_write_close();
+    jsonResponse(weatherWarningsSnapshot($configuration, $preferences));
     exit;
 }
 if ($path === '/week-context') {

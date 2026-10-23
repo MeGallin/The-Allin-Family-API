@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /** Only fixed public providers are fetched; no user-supplied URL or personal event data. */
-function publicFeedJson(string $url): array
+function publicFeedBody(string $url, string $accept = 'application/json'): string
 {
     if (!function_exists('curl_init')) throw new RuntimeException('Public feed transport unavailable.');
     $curl = curl_init($url);
@@ -11,7 +11,7 @@ function publicFeedJson(string $url): array
         CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_TIMEOUT => 4,
         CURLOPT_FOLLOWLOCATION => false, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
         CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
-        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        CURLOPT_HTTPHEADER => ['Accept: ' . $accept],
         CURLOPT_USERAGENT => 'AllinFamily/1.0 (private family dashboard)',
         CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$body): int {
             if (strlen($body) + strlen($chunk) > 1048576) return 0;
@@ -23,10 +23,15 @@ function publicFeedJson(string $url): array
         if (curl_exec($curl) === false || curl_getinfo($curl, CURLINFO_RESPONSE_CODE) !== 200) {
             throw new RuntimeException('Public information provider unavailable.');
         }
-        $value = json_decode($body, true, 32, JSON_THROW_ON_ERROR);
-        if (!is_array($value)) throw new RuntimeException('Invalid public information response.');
-        return $value;
+        return $body;
     } finally { curl_close($curl); }
+}
+
+function publicFeedJson(string $url): array
+{
+    $value = json_decode(publicFeedBody($url), true, 32, JSON_THROW_ON_ERROR);
+    if (!is_array($value)) throw new RuntimeException('Invalid public information response.');
+    return $value;
 }
 
 /** Bounded stale fallback, non-blocking refresh lock and five-minute failure backoff. */
