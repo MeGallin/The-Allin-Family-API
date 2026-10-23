@@ -33,10 +33,12 @@ cache key forces a fresh full-view fetch after upgrading from headline-only data
 
 Tests: `C:/xampp/php/php.exe tests/food-alerts-unit.php` (34 checks), plus
 `C:/xampp/php/php.exe tests/week-context-unit.php` (7 shared-feed checks).
-Deployment requires API and client packages together; there is no database change.
-The client displays these notices on `/alerts`; Home has only the calendar badge.
-The usage section allowlist and client admin labels include `/alerts`, recording
-the section only, without alert titles, IDs or query strings.
+Initial FSA integration requires API and client packages together; there is no
+database change. The later dialog/accordion restyle is a client-only deployment.
+The client opens these notices in the shared Modal from Home's calendar badge;
+there is no longer a dedicated Alerts page or navigation entry. The historical
+`/alerts` usage label remains readable in admin reporting. No alert titles or IDs
+are recorded in usage telemetry.
 
 ## Week Ahead weather and bank holidays
 
