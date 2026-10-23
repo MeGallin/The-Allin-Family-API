@@ -31,9 +31,9 @@ function weekTownSearch(array $config, array $user, mixed $term): array
 {
     $term = familyProfileText($term, 'a town name', 80);
     if (preg_match_all('/./us', $term) < 2) throw new HttpError(422, 'Enter at least two characters for your town.');
-    $result = weekCachedFeed(weekContextDirectory($config), 'town-search-v1:' . $term, 86400, 604800,
+    $result = cachedPublicFeed(weekContextDirectory($config), 'town-search-v1:' . $term, 86400, 604800,
         static function () use ($term): array {
-            $raw = weekProviderJson('https://geocoding-api.open-meteo.com/v1/search?' . http_build_query([
+            $raw = publicFeedJson('https://geocoding-api.open-meteo.com/v1/search?' . http_build_query([
                 'name' => $term, 'count' => 6, 'language' => 'en', 'format' => 'json',
             ]));
             if (isset($raw['error'])) throw new RuntimeException('Town search unavailable.');

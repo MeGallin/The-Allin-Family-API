@@ -4,7 +4,7 @@ declare(strict_types=1);
 // Only section names are stored: never note IDs, titles, search terms or query strings.
 function usagePage($page): string
 {
-    $pages = ['/', '/calendar', '/memories', '/lists', '/polls', '/notes', '/profile', '/admin'];
+    $pages = ['/', '/calendar', '/alerts', '/memories', '/lists', '/polls', '/notes', '/profile', '/admin'];
     $page = is_string($page) ? (rtrim($page, '/') ?: '/') : null;
     return in_array($page, $pages, true) ? $page : '/other';
 }

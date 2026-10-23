@@ -21,17 +21,17 @@ try {
     checkWeek(weekHolidays($holidays, 'england-and-wales')[0]['date'] === '2027-01-01', 'Regions do not leak dates');
     $calls = 0;
     $loader = static function () use (&$calls): array { $calls++; return [['date' => '2026-12-25']]; };
-    $first = weekCachedFeed($directory, 'unit', 1800, 21600, $loader);
-    $second = weekCachedFeed($directory, 'unit', 1800, 21600, $loader);
+    $first = cachedPublicFeed($directory, 'unit', 1800, 21600, $loader);
+    $second = cachedPublicFeed($directory, 'unit', 1800, 21600, $loader);
     checkWeek($calls === 1 && $first['status'] === 'ready' && $second === $first, 'Fresh shared cache avoids provider refresh');
     $path = $directory . '/' . hash('sha256', 'unit') . '.json';
     file_put_contents($path, json_encode(['fetchedAt' => time() - 1900, 'data' => [['date' => '2026-12-25']]]));
     $failing = static function () use (&$calls): array { $calls++; throw new RuntimeException('Simulated provider outage'); };
-    $stale = weekCachedFeed($directory, 'unit', 1800, 21600, $failing);
-    $backoff = weekCachedFeed($directory, 'unit', 1800, 21600, $failing);
+    $stale = cachedPublicFeed($directory, 'unit', 1800, 21600, $failing);
+    $backoff = cachedPublicFeed($directory, 'unit', 1800, 21600, $failing);
     checkWeek($stale['status'] === 'stale' && $backoff['data'] === $stale['data'] && $calls === 2, 'Bounded stale response and failure backoff');
     file_put_contents($path, json_encode(['fetchedAt' => time() - 21601, 'retryAfter' => time() + 300, 'data' => [['date' => '2026-12-25']]]));
-    $expired = weekCachedFeed($directory, 'unit', 1800, 21600, $failing);
+    $expired = cachedPublicFeed($directory, 'unit', 1800, 21600, $failing);
     checkWeek($expired['status'] === 'unavailable' && $expired['data'] === null, 'Expired forecast is never displayed');
     echo json_encode(['passed' => $passed, 'networkRequests' => 0]), PHP_EOL;
 } finally {

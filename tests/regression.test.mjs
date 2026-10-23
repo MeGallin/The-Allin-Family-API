@@ -1,5 +1,6 @@
 import { deadlineTests } from "./regression/deadlines.mjs";
 import { weekPreferenceTests } from './regression/week-preferences.mjs'
+import { foodAlertTests } from './regression/food-alerts.mjs'
 import { isolationTests } from "./regression/isolation.mjs";
 import { before, after } from "node:test";
 import { startEnvironment } from "./support/environment.mjs";
@@ -16,6 +17,7 @@ after(async () => {
 });
 const current = () => environment;
 weekPreferenceTests(current)
+foodAlertTests(current)
 savingTests(current);
 privacyTests(current);
 permissionsTests(current);

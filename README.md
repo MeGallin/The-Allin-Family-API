@@ -3,6 +3,36 @@
 PHP and MySQL API for the separate React client. Account creation and password
 resets are administrator CLI actions. There is no public registration endpoint.
 
+## Food alerts
+
+Authenticated `GET /food-alerts` returns the three newest distinct published FSA
+recall/allergy/food-action notices, their publication dates, safe official HTTPS
+links and the last successful provider check time. No API key, user preference or
+database migration. Source: `https://data.food.gov.uk/food-alerts/id?_limit=20&_sort=-created&_view=full`.
+Withdrawn, invalid and future notices are excluded. The client links to full FSA
+advice rather than making product-safety judgements from partial headlines.
+
+Public transport/cache helpers live in `src/public-feeds.php`, shared with weather
+and bank holidays. Requests verify HTTPS certificates, have bounded time/response
+size, and never send family data. FSA cache lives beside private session storage
+in `public-feeds`, refreshed on demand after 30 minutes, with a nonblocking lock,
+five-minute failure backoff and a six-hour maximum stale fallback. Stale data is
+labelled; unavailable is distinct from an empty feed. Windows paths are canonicalised
+before locked writes so configured `C://...` paths persist actual cache files.
+
+Each notice includes optional normalised `details`: affected product names, pack
+sizes/product codes, batch/date descriptions, risk statements and consumer advice.
+HTML is converted to plain text before storage; React also renders it as text.
+Missing/invalid optional fields stay empty/null for explicit UI fallbacks. The v2
+cache key forces a fresh full-view fetch after upgrading from headline-only data.
+
+Tests: `C:/xampp/php/php.exe tests/food-alerts-unit.php` (34 checks), plus
+`C:/xampp/php/php.exe tests/week-context-unit.php` (7 shared-feed checks).
+Deployment requires API and client packages together; there is no database change.
+The client displays these notices on `/alerts`; Home has only the calendar badge.
+The usage section allowlist and client admin labels include `/alerts`, recording
+the section only, without alert titles, IDs or query strings.
+
 ## Week Ahead weather and bank holidays
 
 The authenticated `GET /week-context` endpoint supplies optional public context;
