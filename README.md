@@ -787,9 +787,8 @@ Private recovery directory also contains before.sql, verify-restore.sql, verify-
 Scoped independent review is complete: the 24 October follow-up marks DS-001–DS-003
 resolved by source inspection, including the client London calendar/link corrections
 and dynamic API fixture date. Tests were not rerun in that review/repair cycle.
-Commit, push and release preparation are authorised; production migration/upload is
-a separate operation. Apply reviewed migrations 018–021 in order with fresh verified
-backups before the matching runtime. Keep local data and demonstration records local.
+Completed production migration/upload and live acceptance steps are recorded below.
+Keep local data and demonstration records local.
 
 Widget publication/diary date rules use Europe/London (including the last seven calendar
 days and future-eaten restriction). The client shares that calendar contract. The widget
@@ -837,3 +836,41 @@ Migration 021_spin_meal_versions.sql captures meal_version on every new private 
 Widget input validation rejects invisible/control-only/oversized values, malformed types, forged IDs and duplicate meal names. Unicode comparison is also checked using prepared parameters and utf8mb4_unicode_ci, including composed/decomposed accented names. Omitted mealType retains the legacy dinner default; an explicit null is invalid. Allowed publication dates are today minus six days through today plus 365 days, using Europe/London. Private trials and actual actor identity continue to come only from the authenticated session.
 
 The widget suite now has 16 passing API cases, including tables of invalid inputs, concurrent stale saves, minimum meals/foreign IDs, removed/private widgets, the 30-installation cap, per-user hiding, independent date/meal slots, eaten retries and full seven-day history. Fixtures are isolated and removed after completion. See client/docs/widget-qa.md for the complete matrix and product rules. No live data was changed.
+
+### Widget production migration, upload and live QA — 24 October 2026
+
+API `47dc2b4` and client `5a84866` were committed/pushed and packaged separately.
+This record supersedes historical widget statements that migrations were local only.
+
+1. With maintenance active, captured fresh database/application/configuration/photo
+   backups, checked copied hashes and gzip/tar integrity, and restored the final paused
+   snapshot to a new isolated scratch. Earlier backup/scratch evidence was retained.
+2. All 16 original table counts and both directions of NULL-safe binary per-column
+   comparisons matched; all 14 original metadata checks returned zero differences.
+3. Through phpMyAdmin file import, rehearsed 018–021 DDL in scratch, executing each
+   migration's ledger insertion separately after observed DDL/schema success. Rechecked
+   original rows, then applied the same qualified DDL/ledger stages to live in order.
+4. Original data and complete live/scratch schema comparisons returned zero differences.
+   All 24 compact checks matched: 23 tables / 21 exact ledger names / four new names /
+   no unexpected names or tables / seven empty widget tables before live activity.
+5. FileZilla uploaded 26 API source files before `index.php`, then the matching client
+   assets before its index; queue empty. No local widget/demo data was imported.
+   Public unauthenticated HTTP verification matched all 122 client files to package
+   SHA-256/bytes; this does not itself verify private API files or `.htaccess`.
+
+Maintenance was completed and live operation resumed. Gary/Dad verified Personal
+and Family QA installation persistence, actor-private trial saving and explicit
+publication, exact Home-to-source navigation, agree/suggest/clear replies after
+refresh, eaten persistence and locked replies, and correction. Mobile 390×844
+wheel/modal layout had no page overflow; current-load console errors were empty.
+Both temporary QA installations were removed using the shared 20-second Undo
+lifecycle (Undo exercised before repeated removal); refresh confirmed no active
+QA widgets/Home results. Soft-deleted audit/history remains; real content was
+not edited. These owner-account checks do not establish fresh multi-account,
+concurrency or cross-timezone coverage.
+
+API private-file hash verification remains incomplete: a private ZIP was created,
+but its download did not complete. Public client hashes do not verify API or routing
+files. PHP syntax/client build checks passed; automated test suites were not rerun
+for this release. Keep backup/comparison/upload evidence private; no public
+migration endpoint was used.
