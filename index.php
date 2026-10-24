@@ -25,6 +25,8 @@ require __DIR__ . '/src/week-preferences.php';
 require __DIR__ . '/src/food-alerts.php';
 require __DIR__ . '/src/weather-warnings.php';
 require __DIR__ . '/src/travel.php';
+require __DIR__ . '/src/widgets.php';
+require __DIR__ . '/src/widget-decisions.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -52,6 +54,9 @@ if ($mount !== '' && $mount !== '.' && ($path === $mount || str_starts_with($pat
 }
 
 $routes = [
+    '/widgets' => ['GET'], '/widgets/add' => ['POST'], '/widgets/edit' => ['POST'],
+    '/widgets/spin' => ['POST'], '/widgets/remove' => ['POST'], '/widgets/remove-meal' => ['POST'], '/widgets/hide' => ['POST'],
+    '/widgets/publish' => ['POST'], '/widgets/respond' => ['POST'], '/widgets/eaten' => ['POST'],
     '/health' => ['GET', 'HEAD'], '/auth/session' => ['GET'], '/auth/login' => ['POST'],
     '/auth/logout' => ['POST'], '/auth/password' => ['POST'], '/family' => ['GET'],
     '/shopping' => ['GET'], '/shopping/add' => ['POST'], '/shopping/edit' => ['POST'],
@@ -186,6 +191,12 @@ if ($path === '/week-context/towns') {
 if ($path === '/admin/activity') {
     $user = requireFamilyUser($db);
     jsonResponse(adminActivitySnapshot($db, $user, $_GET));
+    exit;
+}
+if ($path === '/widgets' || str_starts_with($path, '/widgets/')) {
+    $user = requireFamilyUser($db);
+    if ($path === '/widgets') familySnapshotResponse($db, $user, 'widget', fn() => widgetsSnapshot($db, $user));
+    else jsonResponse(mutateWidget($db, $user, substr($path, strlen('/widgets/')), requestJson()));
     exit;
 }
 if ($path === '/polls' || str_starts_with($path, '/polls/')) {

@@ -781,3 +781,59 @@ Exact cPanel procedure for this release:
 10. Live Gary/Dad desktop390px phone QA: saved/refreshed temporary Central/Circle/Northern lines; live and future Circle notices; actual descriptions/advice fallbacks; official timeline colours; BST/GMT dates; one-open accordion, Enter/Space, Escape/focus return; admin actor/before/after. Restored original live off preference and verified refresh. Two normal audit records remain; no family content created. Twelve stable account/content/history/preference tables were compared against scratch after QA, with zero changes/missing/extra rows (dynamic usage/rate/audit tables excluded only after reopening). Local nineteen-line preferences were not copied to live.
 
 Private recovery directory also contains before.sql, verify-restore.sql, verify-after.sql, verify-family-after-smoke.sql, runtime-api-after.zip, downloaded API and original environment extraction. Keep these private/Git ignored. Scratch restore remains retained with no runtime-user assignment; do not delete it without an explicit cleanup decision. Non-secret evidence and comparison JSON: shared workspace work/hosting/tfl-release-20261023. Live screenshot evidence includes desktop/mobile timelines and future works. Restore of live data is not a routine rollback; agree recovery explicitly before replacing saved family rows.
+
+## Widgets / Dinner Spinner
+
+Scoped independent review is complete: the 24 October follow-up marks DS-001–DS-003
+resolved by source inspection, including the client London calendar/link corrections
+and dynamic API fixture date. Tests were not rerun in that review/repair cycle.
+Commit, push and release preparation are authorised; production migration/upload is
+a separate operation. Apply reviewed migrations 018–021 in order with fresh verified
+backups before the matching runtime. Keep local data and demonstration records local.
+
+Widget publication/diary date rules use Europe/London (including the last seven calendar
+days and future-eaten restriction). The client shares that calendar contract. The widget
+API regression fixture's successful-publication default uses its existing runtime London
+day helper rather than an expiring literal date; intentional rejection dates remain explicit.
+The 24 October scoped review repairs did not execute tests or change API validation/schema.
+
+Migration `018_widgets.sql` adds family_widgets, dinner_meals, dinner_spins and hidden_family_widgets. It adds new tables without rewriting existing family data. Applied only to the isolated local database during implementation; production must use the verified backup/database-release procedure.
+
+Authenticated endpoints: GET /widgets and POST /widgets/{add,edit,spin,remove,remove-meal,hide}. Existing CSRF, authentication, maintenance leases and session protections apply. Widget ownership comes from the session, including for admins. Only owners edit content/visibility or remove it. A family-visible instance may be spun or hidden locally by another authenticated family member. Private records are unavailable to other accounts, including admin.
+
+Server selection uses random_int over active distinct meal choices. The widget row lock serializes writes and spins; versions guard edits/removals. UUID request keys make installation and spins idempotent. Overlapping spins from the same revision return the committed pick rather than creating a second decision. Original meal names are retained on historical picks. GET snapshots batch meal/history reads and bound each history to 10 picks, using ROW_NUMBER supported by the existing MariaDB/MySQL versions.
+
+Admin activity records actor, action, owner ID, kind, visibility, meal count, revision and pick ID as applicable. Private titles, meal names and selected results never enter shared/admin activity snapshots. The API retains full authorized widget history in its own tables. Widget actions are included in admin insights and My Space is recognized by usage statistics.
+
+No live deployment/migration or production-family-content changes were performed for this feature. Client and API must be released together after the established local QA and backed-up live migration steps.
+
+### Dinner publication workflow (migration 019)
+
+This supersedes the immediate shared-spin/coalescing behaviour described in the first widget implementation. All dinner_spins are now private trials projected only to their actor. Independent spins, including simultaneous family users, are independent random selections; UUID retries return the same actor's committed trial. Trials do not update family_widgets revision/timestamps or any published suggestion. Legacy trials are not automatically published.
+
+019_dinner_publications.sql adds immutable dinner_publications, recorded dinner_publication_members and versioned dinner_responses. It was applied only to the isolated local database. Existing widgets/meals/trials are preserved.
+
+POST /widgets/publish requires an accessible family installation, an actor-owned trial whose meal ID/title still match an active choice, the current widget revision, expected previousPublicationId, valid forDate and UUID requestKey. It locks the widget, inserts a new publication and its active audience, increments the widget revision and records safe audit metadata. Duplicate requests cannot duplicate publications; concurrent replacements require review. Each trial can be published once. New active members appear in the current audience and can respond; previous publication audiences remain recorded.
+
+POST /widgets/respond requires the current publication ID, a response of agree/another/null, and the actor's responseVersion (0 for none). It locks the widget, accepts only the actor's own response, rejects stale versions/old publications and records response changes/withdrawal. A publisher is not automatically marked as agreeing. Replacements preserve prior publication/response rows. Current snapshots return the latest 10 publications with nickname-projected publishers/participants and responses, alongside only the requesting actor's last 10 private trials.
+
+Admin activity captures actor, publication/pick IDs, dinner date, response changes and metadata; private trial meal names never enter the shared activity table. No new database contents were generated for UI demonstration. Build/syntax checks passed; full functional/privacy/concurrency QA and automated regression tests remain pending.
+
+### Dinner Spinner regression checks
+Run `node --test tests/widgets.test.mjs` from the API repository, or `npm run test:widgets` from the client to include dashboard UI checks. Uses the existing disposable regression database, temporary restricted database user and temporary sessions. Covers personal-widget privacy (including admin), actor-private spins on shared widgets, owner-only edits, idempotent retries, publication persistence, independent replies, response versions, replacement history, authentication and CSRF. The fixture is removed after completion.
+
+### Multiple meals and seven-day diary
+Migration 020_meal_diary.sql adds a meal slot (breakfast/lunch/dinner/other), eaten timestamp/actor and a slot index. Existing publications default to dinner, preserving real family entries. Apply locally with the existing migration command; production requires the separate backed-up database-release workflow before uploading the matching API and client.
+
+Publishing now replaces only the choice for the same installation, date and meal slot. Other meals/dates keep their publications and responses. The snapshot returns current choices for the rolling seven-day window and upcoming dates, plus the ten recent publication records for replacement history. Replaced choices remain stored. Responses are validated against the latest publication for that specific date/slot, never the newest publication for another meal.
+
+A published meal stands as the default immediately when nobody replies. No synthetic agreement or inferred vote is written: active family replies stay explicit for analytics. A request for another meal flags review; it does not silently generate or publish a different choice. Mark as eaten / correct eaten record is an explicit audited, version-checked family action on the current slot publication. Future dates cannot be marked eaten. An eaten meal locks replacement/replies until its record is corrected. Admin audit metadata records slot/date/publication/eaten state and actor, excluding private trial meal names. Widget ETags include the meal representation and London calendar date so the diary rolls over and old cached payloads are refreshed.
+
+Meal diary QA (24 October 2026): all seven database-backed widget tests passed, including separate date/meal slots, more than ten current publications, eaten actor/time persistence and correction, replay idempotency, completed/future/stale-write guards and original privacy/permission coverage. Retrying the same eaten state preserves its original actor and timestamp and succeeds without another audit event; a stale request that would change state still returns a conflict. Tests use the established disposable regression fixture only. The client test:widgets command additionally runs 12 client checks (19 combined). No live database or deployment was involved.
+
+### Widget adversarial review and migration 021
+Migration 021_spin_meal_versions.sql captures meal_version on every new private spin. Publishing checks the stored revision and exact title against the active meal. Case-only renames now increment that revision too. Matching legacy trial records are backfilled with their current active meal revision; old original revisions were never stored and cannot be reconstructed. The migration has been applied locally only; production requires the established backed-up release workflow.
+
+Widget input validation rejects invisible/control-only/oversized values, malformed types, forged IDs and duplicate meal names. Unicode comparison is also checked using prepared parameters and utf8mb4_unicode_ci, including composed/decomposed accented names. Omitted mealType retains the legacy dinner default; an explicit null is invalid. Allowed publication dates are today minus six days through today plus 365 days, using Europe/London. Private trials and actual actor identity continue to come only from the authenticated session.
+
+The widget suite now has 16 passing API cases, including tables of invalid inputs, concurrent stale saves, minimum meals/foreign IDs, removed/private widgets, the 30-installation cap, per-user hiding, independent date/meal slots, eaten retries and full seven-day history. Fixtures are isolated and removed after completion. See client/docs/widget-qa.md for the complete matrix and product rules. No live data was changed.

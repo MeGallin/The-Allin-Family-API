@@ -5,7 +5,7 @@ function insightCategory(string $action): string
 {
     if ($action === 'created') return 'created';
     if ($action === 'removed') return 'removed';
-    if (in_array($action, ['liked','unliked','voted','vote_changed','vote_withdrawn'], true)) return 'responded';
+    if (in_array($action, ['liked','unliked','voted','vote_changed','vote_withdrawn','spun','dinner_responded','dinner_response_changed','dinner_response_withdrawn'], true)) return 'responded';
     return 'updated';
 }
 
