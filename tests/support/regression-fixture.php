@@ -6,16 +6,20 @@ $local = loadConfiguration($root . '/.env');
 if ($local['APP_ENV'] !== 'local' || $local['DB_HOST'] !== '127.0.0.1' || $local['DB_PORT'] !== '3307' || $local['DB_NAME'] === 'theallinfamily_regression_test') {
     throw new RuntimeException('Regression fixtures require the separate local server at 127.0.0.1:3307.');
 }
-$directory = $root . '/.local/regression';
+$requestedRun = $argv[2] ?? '';
+if (!preg_match('/^[a-f0-9]{48}$/D', $requestedRun)) throw new RuntimeException('Supply the exact regression run ownership token.');
+$suite = $argv[3] ?? 'regression';
+if (!in_array($suite, ['regression','sudoku'], true)) throw new RuntimeException('Unknown fixture suite.');
+if ($suite === 'sudoku' && $local['DB_NAME'] !== 'theallinfamily') throw new RuntimeException('Sudoku QA requires the expected development config, never another fixture.');
+$suffix = substr($requestedRun, 0, 12);
+$directory = $root . ($suite === 'sudoku' ? '/.local/sudoku-regression-' . $suffix : '/.local/regression');
 $file = $directory . '/fixture.json';
 if (is_link($root . '/.local') || is_link($directory) || (is_dir($directory) && dirname((string)realpath($directory)) !== realpath($root . '/.local'))) throw new RuntimeException('Unsafe fixture root directory.');
-$name = 'theallinfamily_regression_test';
-$account = 'allinfamily_regression';
+$name = $suite === 'sudoku' ? 'allin_sudoku_test_' . $suffix : 'theallinfamily_regression_test';
+$account = $suite === 'sudoku' ? 'allin_sd_' . $suffix : 'allinfamily_regression';
 $admin = parse_ini_file($root . '/.local/mysql-admin.ini', false, INI_SCANNER_RAW);
 $db = new PDO('mysql:host=127.0.0.1;port=3307;charset=utf8mb4', 'root', $admin['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 $mode = $argv[1] ?? '';
-$requestedRun = $argv[2] ?? '';
-if (!preg_match('/^[a-f0-9]{48}$/D', $requestedRun)) throw new RuntimeException('Supply the exact regression run ownership token.');
 if ($mode === 'cleanup') {
     if (!is_file($file)) throw new RuntimeException('Missing fixture ownership marker; refusing cleanup.');
     $config = json_decode(file_get_contents($file), true, 32, JSON_THROW_ON_ERROR);

@@ -11,14 +11,24 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const php =
   process.env.PHP_BINARY ||
   (process.platform === "win32" ? "C:/xampp/php/php.exe" : "php");
-const fixture = (mode, runId) =>
-  execFileSync(php, ["tests/support/regression-fixture.php", mode, runId], {
-    cwd: root,
-    stdio: "inherit",
-    windowsHide: true,
-  });
-export async function startEnvironment() {
+const fixture = (mode, runId, suite) =>
+  execFileSync(
+    php,
+    ["tests/support/regression-fixture.php", mode, runId, suite],
+    {
+      cwd: root,
+      stdio: "inherit",
+      windowsHide: true,
+    },
+  );
+export async function startEnvironment({ suite = "regression" } = {}) {
+  assert.ok(["regression", "sudoku"].includes(suite));
   const runId = randomBytes(24).toString("hex");
+  const directory =
+    suite === "sudoku"
+      ? `.local/sudoku-regression-${runId.slice(0, 12)}`
+      : ".local/regression";
+  const fixtureFile = resolve(root, directory, "fixture.json");
   let server,
     log,
     ownsFixture = false,
@@ -33,20 +43,23 @@ export async function startEnvironment() {
     }
     if (log !== undefined) closeSync(log);
     if (!ownsFixture) return;
-    fixture("cleanup", runId);
+    fixture("cleanup", runId, suite);
     assert.equal(
-      existsSync(resolve(root, ".local/regression/fixture.json")),
+      existsSync(fixtureFile),
       false,
       "Disposable fixture marker must be gone",
     );
   };
   try {
-    fixture("create", runId);
+    fixture("create", runId, suite);
     ownsFixture = true;
-    const config = JSON.parse(
-      readFileSync(resolve(root, ".local/regression/fixture.json"), "utf8"),
+    const config = JSON.parse(readFileSync(fixtureFile, "utf8"));
+    assert.equal(
+      config.DB_NAME,
+      suite === "sudoku"
+        ? `allin_sudoku_test_${runId.slice(0, 12)}`
+        : "theallinfamily_regression_test",
     );
-    assert.equal(config.DB_NAME, "theallinfamily_regression_test");
     assert.equal(config.APP_ENV, "test");
     const port = await new Promise((done, reject) => {
       const probe = createServer();
@@ -56,7 +69,7 @@ export async function startEnvironment() {
         probe.close(() => done(port));
       });
     });
-    log = openSync(resolve(root, ".local/regression/server.log"), "a");
+    log = openSync(resolve(root, directory, "server.log"), "a");
     const runtime = Object.fromEntries(
       Object.entries(config).filter(([key]) => !key.startsWith("TEST_")),
     );
@@ -159,20 +172,21 @@ export async function startEnvironment() {
         return this;
       }
     }
-    const env = { stop, users: config.TEST_USERS, client: () => new Client() };
+    const env = {
+      stop,
+      fixtureFile,
+      runId,
+      users: config.TEST_USERS,
+      client: () => new Client(),
+    };
     env.owner = await env.client().login("owner");
     env.member = await env.client().login("member");
     env.admin = await env.client().login("admin");
     return env;
   } catch (error) {
     // A create/migration failure may leave the marked database for explicit recovery.
-    if (
-      !ownsFixture &&
-      existsSync(resolve(root, ".local/regression/fixture.json"))
-    ) {
-      const marker = JSON.parse(
-        readFileSync(resolve(root, ".local/regression/fixture.json"), "utf8"),
-      );
+    if (!ownsFixture && existsSync(fixtureFile)) {
+      const marker = JSON.parse(readFileSync(fixtureFile, "utf8"));
       ownsFixture = marker.TEST_RUN_ID === runId;
     }
     await stop();

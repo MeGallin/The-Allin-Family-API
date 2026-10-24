@@ -874,3 +874,60 @@ but its download did not complete. Public client hashes do not verify API or rou
 files. PHP syntax/client build checks passed; automated test suites were not rerun
 for this release. Keep backup/comparison/upload evidence private; no public
 migration endpoint was used.
+
+## Personal Sudoku v1 — local implementation
+
+Migration `022_sudoku.sql` adds `user_sudoku`, one singleton row per owner,
+independent of Dinner Spinner/family widget payloads. No existing data backfill.
+Local 022 was applied only after the expected isolated APP_ENV/host/port/database
+and sole-pending migration were checked and a full private dump retained. Old
+23 table row counts were preserved (ledger +1); new Sudoku row count 0. No test
+game was seeded. Nothing in this increment has been deployed to production.
+
+Authenticated GET `/sudoku` and CSRF-protected POST `/sudoku/install`, `/save`,
+`/new`, `/restart`, `/remove` always infer ownership from the session; administrators
+and family members have no application override to read another user's board.
+Stored schema v1 holds givens, entries, 81 note bitmasks, pause/completion, level,
+monotonic version, retry hashes and soft-delete timestamps. Install's expected
+version also prevents a delayed old request from resurrecting a removed game.
+Saves permit incomplete/conflicting user entries, enforce immutable clues and
+validate every entry/mask; completion requires a valid full board. Conflicts
+return 409 and the client retains its local draft.
+
+Puzzles are generated in `src/sudoku-puzzles.php`, using a transformed valid solved
+pattern and clue removal only when bounded search proves a single solution.
+42/36/30 clues describe the three levels; they are not independent human-solving
+ratings. The whole call has 100,000 search nodes, a 3.5-second deadline and three
+attempts. Generation happens before owner locks and any prior game replacement;
+failure leaves the old game intact. No external puzzle dataset/dependency.
+
+Only install/new/restart/completed/removed lifecycle metadata is audited, without
+board/givens/notes/private payloads. Regular progress saves do not create per-cell
+activity. Removed singleton rows are retained; a deliberate reinstall replaces
+the current game with a higher revision. There is no archive of playable old games.
+
+Future production order: the established maintenance/fresh backup/rehearsal
+workflow, reviewed 022 DDL plus ledger after success, data/schema/grant checks,
+matching API runtime, client last. Runtime needs CRUD on `user_sudoku`; deployment
+credentials separately need the reviewed DDL/ledger privileges. Do not put tools,
+SQL/dumps or `.local` files behind an app endpoint. No live migration is authorised
+by this local development task. PHP syntax/source review passed; no generator,
+gameplay or automated tests were executed for this implementation-only request.
+
+### Subsequent authorised Sudoku QA
+
+Run `node --test tests/sudoku.test.mjs` from this API root. It requires the expected
+local configuration at 127.0.0.1:3307 and private local test provisioning credentials.
+The harness creates an unpredictable `allin_sudoku_test_<token>` database/account,
+synthetic users and private session directory; marker-checked cleanup drops only
+that disposable fixture. The existing default regression fixture is not reused.
+Never point this command at production. No credentials are printed or committed.
+
+The 10-case suite passed: independent unique-solution counting for two puzzles per
+42/36/30-clue level; session/CSRF/member/admin ownership isolation; immutable clues,
+entry/note types, valid completion and metadata-only audit; retry/body-key/version
+safety; two competing PHP processes (one current-version winner, one conflict);
+soft remove/reinstall and stale resurrection protection. Pure PHP checks also
+force solver node/deadline exhaustion. The generator HTTP 503 path was not forced.
+Synthetic tests do not mutate the application's development Sudoku row. Client
+and browser QA/results are recorded in the workspace Sudoku QA handoff.

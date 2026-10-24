@@ -27,6 +27,8 @@ require __DIR__ . '/src/weather-warnings.php';
 require __DIR__ . '/src/travel.php';
 require __DIR__ . '/src/widgets.php';
 require __DIR__ . '/src/widget-decisions.php';
+require __DIR__ . '/src/sudoku-puzzles.php';
+require __DIR__ . '/src/sudoku.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -54,6 +56,8 @@ if ($mount !== '' && $mount !== '.' && ($path === $mount || str_starts_with($pat
 }
 
 $routes = [
+    '/sudoku' => ['GET'], '/sudoku/install' => ['POST'], '/sudoku/save' => ['POST'],
+    '/sudoku/new' => ['POST'], '/sudoku/restart' => ['POST'], '/sudoku/remove' => ['POST'],
     '/widgets' => ['GET'], '/widgets/add' => ['POST'], '/widgets/edit' => ['POST'],
     '/widgets/spin' => ['POST'], '/widgets/remove' => ['POST'], '/widgets/remove-meal' => ['POST'], '/widgets/hide' => ['POST'],
     '/widgets/publish' => ['POST'], '/widgets/respond' => ['POST'], '/widgets/eaten' => ['POST'],
@@ -193,6 +197,12 @@ if ($path === '/admin/activity') {
     jsonResponse(adminActivitySnapshot($db, $user, $_GET));
     exit;
 }
+if ($path === '/sudoku' || str_starts_with($path, '/sudoku/')) {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/sudoku' ? sudokuSnapshot($db, $user) : mutateSudoku($db, $user, substr($path, strlen('/sudoku/')), requestJson()));
+    exit;
+}
+
 if ($path === '/widgets' || str_starts_with($path, '/widgets/')) {
     $user = requireFamilyUser($db);
     if ($path === '/widgets') familySnapshotResponse($db, $user, 'widget', fn() => widgetsSnapshot($db, $user));
