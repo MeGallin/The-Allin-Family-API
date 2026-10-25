@@ -9,14 +9,14 @@ if ($local['APP_ENV'] !== 'local' || $local['DB_HOST'] !== '127.0.0.1' || $local
 $requestedRun = $argv[2] ?? '';
 if (!preg_match('/^[a-f0-9]{48}$/D', $requestedRun)) throw new RuntimeException('Supply the exact regression run ownership token.');
 $suite = $argv[3] ?? 'regression';
-if (!in_array($suite, ['regression','sudoku','daily-word'], true)) throw new RuntimeException('Unknown fixture suite.');
+if (!in_array($suite, ['regression','sudoku','daily-word','focus-timer'], true)) throw new RuntimeException('Unknown fixture suite.');
 if ($suite !== 'regression' && $local['DB_NAME'] !== 'theallinfamily') throw new RuntimeException('Sudoku QA requires the expected development config, never another fixture.');
 $suffix = substr($requestedRun, 0, 12);
 $directory = $root . ($suite !== 'regression' ? '/.local/'.$suite.'-regression-' . $suffix : '/.local/regression');
 $file = $directory . '/fixture.json';
 if (is_link($root . '/.local') || is_link($directory) || (is_dir($directory) && dirname((string)realpath($directory)) !== realpath($root . '/.local'))) throw new RuntimeException('Unsafe fixture root directory.');
-$name = $suite !== 'regression' ? 'allin_'.($suite==='sudoku'?'sudoku':'word').'_test_' . $suffix : 'theallinfamily_regression_test';
-$account = $suite !== 'regression' ? 'allin_'.($suite==='sudoku'?'sd':'dw').'_' . $suffix : 'allinfamily_regression';
+$name = $suite !== 'regression' ? 'allin_'.($suite==='sudoku'?'sudoku':($suite==='focus-timer'?'focus':'word')).'_test_' . $suffix : 'theallinfamily_regression_test';
+$account = $suite !== 'regression' ? 'allin_'.($suite==='sudoku'?'sd':($suite==='focus-timer'?'ft':'dw')).'_' . $suffix : 'allinfamily_regression';
 $admin = parse_ini_file($root . '/.local/mysql-admin.ini', false, INI_SCANNER_RAW);
 $db = new PDO('mysql:host=127.0.0.1;port=3307;charset=utf8mb4', 'root', $admin['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 $mode = $argv[1] ?? '';

@@ -5,7 +5,7 @@ function adminActivityTypes(): array
 {
     // Daily Word exposes lifecycle/publication metadata only to administrators.
     // It is a separate entity so private installation events cannot change family widget ETags.
-    return ['shopping_item', 'calendar_event', 'memory', 'poll', 'user_profile', 'user_account', 'widget', 'daily_word'];
+    return ['shopping_item', 'calendar_event', 'memory', 'poll', 'user_profile', 'user_account', 'widget', 'daily_word', 'focus_timer'];
 }
 
 // Call inside the same transaction as the domain write. Actor identity comes only from the session.

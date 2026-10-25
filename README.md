@@ -8,6 +8,66 @@ limitations are documented in [ROUTINE-BACKUPS.md](ROUTINE-BACKUPS.md).
 PHP and MySQL API for the separate React client. Account creation and password
 resets are administrator CLI actions. There is no public registration endpoint.
 
+## Focus Timer — authorised release preparation, production pending
+
+Migration 024_focus_timer.sql adds three private domains: owner installation/defaults/
+current pointer, session history and durable action receipts. It is applied only
+to the backed-up isolated local database. Production has not been changed for this
+feature. No example session or personal installation is seeded.
+
+Authenticated GET `/focus-timer` returns only the caller's installation, current
+timer, private seven-London-day strip/totals/recent history and server UTC time.
+POST `/focus-timer/{install,start,pause,resume,finish,reset,next,remove}` requires
+CSRF, UUID `requestKey`, monotonic `version`, installation `generation` and (except
+install) exact `sessionId` (null for a ready timer). Start/next additionally take
+phase focus/short/long, whole minutes and optional label. Server duration bounds
+are Focus 5–180 minutes/break 1–60; label max 80 Unicode characters. Ownership comes
+only from session; members/admins have no target-user bypass.
+
+One owner lock checks all guards and writes state/immutable receipt atomically.
+Accepted retries are checked before stale state; altered owner/domain/UUID reuse
+fails. UTC millisecond intervals/deadlines cap elapsed time and exclude pauses;
+a delayed Pause at zero remains elapsed. Finish differentiates completed/early,
+Reset discards, and explicit next closes elapsed/start-new atomically. No automatic
+phase cycle or saved completion from GET. The seven-day all-row aggregate uses UTC
+hour buckets mapped to Europe/London in PHP, including DST calendar bounds, without
+depending on MySQL timezone tables or the bounded recent list.
+
+Remove after the shared 20 second Undo rechecks version/generation/current ID, stops
+and archives current state, preserves history and invalidates late actions. Reinstall
+retains defaults/history and starts no timer. Private labels/timing/progress are
+excluded from family/admin payloads; generic install/remove metadata uses separate
+admin-only `focus_timer`, not shared widget cache revisions. Existing generic
+Widgets-section usage remains, without focus query or private timer fields.
+
+Quiet visual v1 needs no key, external service, scheduler or dependency and promises
+no alarm while a browser is closed/asleep. Clients must refresh authoritative state
+after immutable acknowledgements, preserve in-memory uncertain requests through
+in-app refresh, and not claim those keys survive full reload. See client
+`docs/focus-timer.md` for the detailed UI/time/privacy contract and release boundary.
+Local functional QA was subsequently authorised on 25 October 2026. Run
+`node --test tests/focus-timer.test.mjs` for the marked disposable local DB/account
+suite with synthetic identities. It covers authentication/CSRF/private projection,
+precise capped intervals, pause expiry, CAS/true parallel races, immutable historical
+receipts, removal/reinstall, atomic next phase and London DST/all-row summary bounds.
+An optional internal domain-function instant supports deterministic fixtures; the
+HTTP controller never forwards a clock override. Disposable database/account/session/
+photo cleanup is verified. Parent real-duration browser QA and named owner-only
+baseline cleanup are separate; see workspace `reports/cody/2026-10-25-focus-timer-qa.md`
+for executed results/limits. No production migration, commit, push or deployment
+is part of this local QA phase.
+
+Subsequent release authorisation25October2026 permits both repository commits/pushes
+and separate standard deployment packages. Production migration/upload remain the
+parent's responsibility: NEW maintenance-held database/Home backup, verified empty
+scratch restore and024 rehearsal, old29table row/schema preservation, then live024
+and its separate ledger acknowledgement. Expected32tables/24ledger entries after
+the three new tables (8/11/5columns,3PKs/3ownerFKs,oneJSONcheck) are verified empty.
+No ALTER/UPDATE/DELETE/backfill occurs in024; old data is not replaced. Upload only
+matching reviewed runtime files; preserve active .env, routing and private storage.
+Do not restore local family data to production. See DATABASE-RELEASE.md and the
+workspace Focus release handoff for exact prepared SQL and package paths.
+
 ## Daily Word
 
 Migration `023_daily_word.sql` adds private owner installations, immutable dated

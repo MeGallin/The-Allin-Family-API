@@ -22,7 +22,7 @@ const fixture = (mode, runId, suite) =>
     },
   );
 export async function startEnvironment({ suite = "regression" } = {}) {
-  assert.ok(["regression", "sudoku", "daily-word"].includes(suite));
+  assert.ok(["regression", "sudoku", "daily-word", "focus-timer"].includes(suite));
   const runId = randomBytes(24).toString("hex");
   const directory =
     suite !== "regression"
@@ -57,7 +57,7 @@ export async function startEnvironment({ suite = "regression" } = {}) {
     assert.equal(
       config.DB_NAME,
       suite !== "regression"
-        ? `allin_${suite === "sudoku" ? "sudoku" : "word"}_test_${runId.slice(0, 12)}`
+        ? `allin_${suite === "sudoku" ? "sudoku" : suite === "focus-timer" ? "focus" : "word"}_test_${runId.slice(0, 12)}`
         : "theallinfamily_regression_test",
     );
     assert.equal(config.APP_ENV, "test");

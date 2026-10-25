@@ -30,6 +30,7 @@ require __DIR__ . '/src/widget-decisions.php';
 require __DIR__ . '/src/sudoku-puzzles.php';
 require __DIR__ . '/src/sudoku.php';
 require __DIR__ . '/src/daily-word.php';
+require __DIR__ . '/src/focus-timer.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -57,6 +58,9 @@ if ($mount !== '' && $mount !== '.' && ($path === $mount || str_starts_with($pat
 }
 
 $routes = [
+    '/focus-timer' => ['GET'], '/focus-timer/install' => ['POST'], '/focus-timer/start' => ['POST'],
+    '/focus-timer/pause' => ['POST'], '/focus-timer/resume' => ['POST'], '/focus-timer/finish' => ['POST'],
+    '/focus-timer/reset' => ['POST'], '/focus-timer/next' => ['POST'], '/focus-timer/remove' => ['POST'],
     '/daily-word' => ['GET'], '/daily-word/results' => ['GET'],
     '/daily-word/install' => ['POST'], '/daily-word/remove' => ['POST'],
     '/daily-word/guess' => ['POST'], '/daily-word/share' => ['POST'], '/daily-word/withdraw' => ['POST'],
@@ -199,6 +203,11 @@ if ($path === '/week-context/towns') {
 if ($path === '/admin/activity') {
     $user = requireFamilyUser($db);
     jsonResponse(adminActivitySnapshot($db, $user, $_GET));
+    exit;
+}
+if ($path === '/focus-timer' || str_starts_with($path, '/focus-timer/')) {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/focus-timer' ? focusTimerSnapshot($db, $user) : mutateFocusTimer($db, $user, substr($path, strlen('/focus-timer/')), requestJson()));
     exit;
 }
 if ($path === '/daily-word' || str_starts_with($path, '/daily-word/')) {
