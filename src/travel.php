@@ -40,13 +40,13 @@ function validatedTravelLines(mixed $lines): array
 function saveTravelPreferences(PDO $db, array $user, array $body): array
 {
     $lines = validatedTravelLines($body['lines'] ?? null);
-    if (!is_int($body['version'] ?? null) || $body['version'] < 0) throw new HttpError(422, 'Reload your travel preferences before saving.');
+    if (!is_int($body['version'] ?? null) || $body['version'] < 0) throw new HttpError(422, 'Reload your TfL preferences before saving.');
     $db->beginTransaction();
     try {
         $lock = $db->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
         $lock->execute([$user['id']]);
         $before = travelPreferences($db, $user);
-        if ($before['version'] !== $body['version']) throw new HttpError(409, 'Your travel choices changed elsewhere. Reload them before saving.', 'travel_preferences_conflict');
+        if ($before['version'] !== $body['version']) throw new HttpError(409, 'Your TfL choices changed elsewhere. Reload them before saving.', 'travel_preferences_conflict');
         if ($before['lines'] !== $lines || $before['version'] === 0) {
             $db->prepare('INSERT INTO user_travel_preferences (user_id, lines_json, version, updated_at)
                 VALUES (?, ?, ?, UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE lines_json = VALUES(lines_json),

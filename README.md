@@ -1088,3 +1088,18 @@ soft remove/reinstall and stale resurrection protection. Pure PHP checks also
 force solver node/deadline exhaustion. The generator HTTP 503 path was not forced.
 Synthetic tests do not mutate the application's development Sudoku row. Client
 and browser QA/results are recorded in the workspace Sudoku QA handoff.
+
+### Local UI/UX copy correction — 25 October 2026
+
+The current travel-preferences validation and optimistic-conflict messages now say
+TfL preferences/choices. This change edits two message literals in `src/travel.php`
+only; routes, validation, locking, permissions, audit history and database schema
+are unchanged. PHP syntax validation passed. No API release package, migration,
+commit, push or deployment is included in this local remediation task.
+
+The user subsequently authorized this copy-only release. Final PHP syntax and
+whitespace checks passed; no migration is required. The approved full API package
+will be built and hash-checked, but the scoped production upload is only
+`api/src/travel.php` before the matching client release. Preserve remote `.env`,
+routing, private storage and all unchanged runtime/data files. Parent owns
+FileZilla/live acceptance; package preparation does not claim deployment.
