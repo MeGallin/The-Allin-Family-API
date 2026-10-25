@@ -8,12 +8,28 @@ limitations are documented in [ROUTINE-BACKUPS.md](ROUTINE-BACKUPS.md).
 PHP and MySQL API for the separate React client. Account creation and password
 resets are administrator CLI actions. There is no public registration endpoint.
 
-## Daily Word (local implementation)
+## Daily Word
 
 Migration `023_daily_word.sql` adds private owner installations, immutable dated
 challenges, retained owner/day progress, durable write receipts and private
-lifecycle history. It was applied only to the isolated local database after a
-guarded backup. Production has not been migrated or deployed for Daily Word.
+lifecycle history. Daily Word was deployed to production on 25 October 2026 after
+fresh maintenance-held DB/Home backups, an isolated restore/rehearsal, additive023
+migration and verification that all24pre-existing tables and their rows were
+preserved. Both API (including private assets/notices) and client packages were
+uploaded;129public client files matched package bytes/SHA256. Health is healthy
+and direct env/source/word-asset requests return403. Gary/Dad live smoke acceptance
+covered installation/reload at0attempts, invalid-word rejection, draft protection,
+help, private family-view boundaries, mobile fit and removal/Undo. No valid guesses,
+completion or result shares were written live, preserving Gary's daily attempts;
+those full flows were exercised in the authorised local QA. Final normal removal
+and reload confirmed Install again with0validattempts consumed; ordinary soft-delete
+history/audit and the shared challenge were retained. The temporary viewport was
+reset and the final live browser warning/error log was empty.
+
+Packaged runtime source: API `11183943d41950a89702dd12fb40e80c0a4dbecc`, client
+`684aa6a8b6479c8a2100da03a29c6338e0415e41`. Word files use canonical LF endings;
+provenance hashes agree with Git, working files and the package. The API release
+handoff records the small provenance correction to the initial release commit.
 
 Authenticated `GET /daily-word` returns only the caller's installation, board,
 seven-day history and server London-day/expiry metadata. `GET /daily-word/results`
