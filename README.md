@@ -1103,3 +1103,13 @@ will be built and hash-checked, but the scoped production upload is only
 `api/src/travel.php` before the matching client release. Preserve remote `.env`,
 routing, private storage and all unchanged runtime/data files. Parent owns
 FileZilla/live acceptance; package preparation does not claim deployment.
+
+Release complete25October2026: API runtime8c6ec81492caa458447050171e2b1ca4820724ca
+is live alongside client55f951bb5935f6faa873cf1f0e479628c906c4d6. Parent FileZilla
+uploaded only verified8691-byte api/src/travel.php; all other runtime/routing/Word
+files, configured.env and private storage preserved. No schema/migration or data
+operation. Public API health200/statusok and client133/133 exact hashes passed;
+parent live owner-browser QA passed with no family-content writes or console
+warnings/errors. Existing Focus remains installed Ready25:00. Private evidence
+`.local/production-releases/20261025-uiux/`; workspace release handoff records the
+full acceptance. This documentation-only follow-up needs no runtime rebuild/upload.
