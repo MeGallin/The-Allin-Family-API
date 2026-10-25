@@ -8,12 +8,14 @@ limitations are documented in [ROUTINE-BACKUPS.md](ROUTINE-BACKUPS.md).
 PHP and MySQL API for the separate React client. Account creation and password
 resets are administrator CLI actions. There is no public registration endpoint.
 
-## Focus Timer — authorised release preparation, production pending
+## Focus Timer — released 25 October 2026
 
 Migration 024_focus_timer.sql adds three private domains: owner installation/defaults/
-current pointer, session history and durable action receipts. It is applied only
-to the backed-up isolated local database. Production has not been changed for this
-feature. No example session or personal installation is seeded.
+current pointer, session history and durable action receipts. It was applied to
+production after fresh maintenance-held DB/Home backups, verified scratch restore
+and rehearsal. All 29 original tables and rows were preserved. The resulting schema
+has 32 tables and 24 ledger entries; all three new tables were empty before actual
+user installation. No example session or personal installation is seeded.
 
 Authenticated GET `/focus-timer` returns only the caller's installation, current
 timer, private seven-London-day strip/totals/recent history and server UTC time.
@@ -57,16 +59,37 @@ baseline cleanup are separate; see workspace `reports/cody/2026-10-25-focus-time
 for executed results/limits. No production migration, commit, push or deployment
 is part of this local QA phase.
 
-Subsequent release authorisation25October2026 permits both repository commits/pushes
-and separate standard deployment packages. Production migration/upload remain the
-parent's responsibility: NEW maintenance-held database/Home backup, verified empty
-scratch restore and024 rehearsal, old29table row/schema preservation, then live024
-and its separate ledger acknowledgement. Expected32tables/24ledger entries after
-the three new tables (8/11/5columns,3PKs/3ownerFKs,oneJSONcheck) are verified empty.
-No ALTER/UPDATE/DELETE/backfill occurs in024; old data is not replaced. Upload only
-matching reviewed runtime files; preserve active .env, routing and private storage.
-Do not restore local family data to production. See DATABASE-RELEASE.md and the
-workspace Focus release handoff for exact prepared SQL and package paths.
+Authorised runtime release: API `9a76a0ec1f253ca129a01c852f44521825c21541` and client
+`8e3b8d908b1b15b544f3f1f74560442824524f9e`. Parent executed production operations;
+Reviewee independently checked the prepared SQL and saved preservation evidence.
+The three new tables have 8/11/5 columns, three primary/owner foreign keys and one
+JSON check. Migration 024 contains no ALTER/UPDATE/DELETE/backfill. Schema checks
+preceded separate ledger acknowledgement; 29 old-table row comparisons and 14
+complete metadata comparisons had zero differences. Runtime focus-timer.php and
+activity.php were uploaded before index.php, followed by 133 client assets and its
+index last. Configuration/routing/photos/private storage and old assets were retained.
+
+Maintenance ended by renaming its private marker to
+`maintenance-completed-20261025-focus-timer.json`. Public health/source/config/word
+asset checks passed 8/8; all 134 public client files matched package bytes/SHA256.
+cPanel NGINX initially cached the old index after upload; Clear Cache returned
+Success and the full client comparison then passed. URL cache-busting alone did
+not bypass that cache. Do not change routing or repeatedly upload correct bytes
+to work around the hosting cache.
+
+Parent live Gary/Dad acceptance passed: actual one-minute short break, Pause00:37
+with exact paused time/sand after reload, Resume/turn/flow, mobile390/page382 and
+320/page312 fit, natural expiry with no automatic next session, and explicit Done
+returning Ready25:00. Private seven-day history records0fullfocus/0focusminutes/
+1breakminute and the completed short break. The installation is intentionally
+retained; no removal/cleanup was requested. These expected owner Focus/lifecycle/
+usage writes occurred after the release preservation gate; configuration/photos
+and existing family data were untouched by the release. Earlier isolated tests
+cover concurrency/privacy beyond this actual-account browser smoke check.
+Private recovery evidence remains in ignored
+`.local/production-releases/20261025-focus-timer`; do not publish its backups or
+credentials. This documentation follow-up does not change the deployed runtime
+commits/packages above and requires no rebuild/upload.
 
 ## Daily Word
 
