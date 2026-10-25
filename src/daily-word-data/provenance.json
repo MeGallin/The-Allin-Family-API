@@ -1,0 +1,22 @@
+{
+  "version": "esdb-2026.02.25-allin-1",
+  "source": "https://github.com/en-wl/wordlist/tree/rel-2026.02.25",
+  "archive": "https://codeload.github.com/en-wl/wordlist/zip/refs/tags/rel-2026.02.25",
+  "archiveSha256": "98c973dd3326bbc7aa3373a7e6460065d04ed1f9a57b66dc362f80298fbf6fec",
+  "extraction": "PYTHONUTF8=1; python combine.py create-db scowl.db; python -m libscowl word-list 70 B,Z 5 --categories= --wo-poses=abbr --wo-usage-notes=vulgar-1,vulgar-2,vulgar-3,offensive-1,offensive-2,offensive-3; retain lowercase ASCII [a-z]{5}, sort unique",
+  "curation": "Common everyday family-appropriate British-English answer shortlist intersected with guesses. Broader upstream British guess list excludes labelled vulgar/offensive entries; labels are not exhaustive. No NYT data.",
+  "files": {
+    "answers.txt": {
+      "count": 696,
+      "sha256": "09d0c3cf9666bea12082581f5a0b9e8fb3bcac8134cc7fb977400f105403d203"
+    },
+    "COPYRIGHT.txt": {
+      "count": 104,
+      "sha256": "090575a131b4260926c7a6b30a90aca0f5db5fbb5c46778e0c5855227bf6ebc3"
+    },
+    "guesses.txt": {
+      "count": 6939,
+      "sha256": "49dae99eaa6ad4e3240628fc1eeb0a0c953f2489ecf2b7c075d2b13abd5c72e1"
+    }
+  }
+}

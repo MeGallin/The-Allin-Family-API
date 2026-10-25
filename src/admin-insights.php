@@ -28,7 +28,7 @@ function adminInsightsSnapshot(PDO $db, array $user, array $query): array
     $previousStart = $start->modify('-'.$days.' days');
     $from = $previousStart->setTimezone($utc)->format('Y-m-d H:i:s');
     $until = $end->setTimezone($utc)->format('Y-m-d H:i:s');
-    $types = sharedActivityTypes();
+    $types = adminActivityTypes();
     $in = implode(',', array_fill(0, count($types), '?'));
     $db->beginTransaction();
     try {

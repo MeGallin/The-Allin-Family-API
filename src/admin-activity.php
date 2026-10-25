@@ -6,7 +6,7 @@ function adminActivitySnapshot(PDO $db, array $user, array $query): array
     requireFamilyAdmin($user);
     $days = familyReportingPeriod($query, true);
     $bounds = familyReportingBounds($days);
-    $types = sharedActivityTypes();
+    $types = adminActivityTypes();
     $type = $query['type'] ?? '';
     $actor = $query['actor'] ?? '';
     $before = $query['before'] ?? '';

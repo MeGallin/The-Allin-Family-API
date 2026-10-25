@@ -8,6 +8,64 @@ limitations are documented in [ROUTINE-BACKUPS.md](ROUTINE-BACKUPS.md).
 PHP and MySQL API for the separate React client. Account creation and password
 resets are administrator CLI actions. There is no public registration endpoint.
 
+## Daily Word (local implementation)
+
+Migration `023_daily_word.sql` adds private owner installations, immutable dated
+challenges, retained owner/day progress, durable write receipts and private
+lifecycle history. It was applied only to the isolated local database after a
+guarded backup. Production has not been migrated or deployed for Daily Word.
+
+Authenticated `GET /daily-word` returns only the caller's installation, board,
+seven-day history and server London-day/expiry metadata. `GET /daily-word/results`
+returns only explicitly shared completed results from seven London days: nickname,
+owner identity, date, outcome and attempt count. It never reveals guesses, answers,
+tile patterns or private participation. No administrator bypass exists.
+
+CSRF-protected `POST /daily-word/{install,remove,guess,share,withdraw}` uses
+`version` (installation generation) and UUID `requestKey`. Guess/share/withdraw
+also require `day` and owner-progress `revision`; guess adds a five-letter `guess`.
+One owner lock protects all checks and writes. Installation removal/reinstallation
+increments generation while retaining attempts. Invalid/duplicate words do not
+consume attempts. Publication is derived from completed progress, never a client
+score; withdrawal retains private history. Private progress never enters family
+or administrator activity payloads. Actual install/remove/share/withdraw transitions
+also record generic administrator-only lifecycle metadata (kind, owner,
+installation generation and visibility), with no date, score, completion, guess or
+pattern. The distinct `daily_word` entity avoids changing family widget ETags.
+
+Receipts are immutable per owner/request key, checked before stale-day/generation
+rejection. Exact accepted retries return their original acknowledgement even after
+later writes, removal or London midnight; altered key reuse fails. Clients must
+refresh authoritative state rather than use an old acknowledgement as a current
+snapshot. New expired guesses are rejected. Challenge creation is date-unique and
+serialised, uses unpredictable randomness, excludes the previous 30 answers, and
+pins the answer/list version. Midnight is calculated using Europe/London calendar
+operations, not a 24-hour duration. Snapshot clock/day coherence is rechecked with
+one bounded rollover retry.
+
+Private runtime assets in `src/daily-word-data/` contain 6,939 British accepted
+guesses, a separate 696-word common answer pool (all accepted), full primary
+`COPYRIGHT.txt` and `provenance.json` with exact source/release/extraction/hashes.
+Source: [ESDB/SCOWL rel-2026.02.25](https://github.com/en-wl/wordlist/tree/rel-2026.02.25).
+No NYT data, external gameplay requests, key or dependency is required. Keep these
+versioned files together; a future dictionary change needs a new version and must
+preserve existing immutable challenge answers. The client packaging script includes
+and requires these exact four assets; direct `src` access remains denied.
+
+Future release requires the established fresh verified-backup/rehearsal workflow,
+additive 023 production migration and both API (including assets/notices) and client
+packages. Initial implementation had source/build checks only. Gary subsequently
+authorised local QA on 25 October. Run `node --test tests/daily-word.test.mjs` for
+the isolated marker-owned `allin_word_test_<random>` database, dedicated restricted
+account and synthetic identities; cleanup verifies database/account removal. It
+never reads or changes Gary's development game. Coverage includes authentication,
+CSRF, installed member/admin ownership, dictionary/score rules, all six receipts,
+old-day replay/new-request expiry, real multi-process CAS and atomic creation,
+share/withdraw/audit privacy and reinstall retention. `tests/daily-word-unit.php`
+also checks pinned data and deterministic 23/25-hour London days. Optional explicit
+instants in domain functions are not exposed through HTTP clock overrides.
+See client `docs/daily-word.md` for UI/state and remaining validation limits.
+
 ## Food alerts
 
 Authenticated `GET /food-alerts` returns the three newest distinct published FSA

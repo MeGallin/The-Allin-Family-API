@@ -22,11 +22,11 @@ const fixture = (mode, runId, suite) =>
     },
   );
 export async function startEnvironment({ suite = "regression" } = {}) {
-  assert.ok(["regression", "sudoku"].includes(suite));
+  assert.ok(["regression", "sudoku", "daily-word"].includes(suite));
   const runId = randomBytes(24).toString("hex");
   const directory =
-    suite === "sudoku"
-      ? `.local/sudoku-regression-${runId.slice(0, 12)}`
+    suite !== "regression"
+      ? `.local/${suite}-regression-${runId.slice(0, 12)}`
       : ".local/regression";
   const fixtureFile = resolve(root, directory, "fixture.json");
   let server,
@@ -56,8 +56,8 @@ export async function startEnvironment({ suite = "regression" } = {}) {
     const config = JSON.parse(readFileSync(fixtureFile, "utf8"));
     assert.equal(
       config.DB_NAME,
-      suite === "sudoku"
-        ? `allin_sudoku_test_${runId.slice(0, 12)}`
+      suite !== "regression"
+        ? `allin_${suite === "sudoku" ? "sudoku" : "word"}_test_${runId.slice(0, 12)}`
         : "theallinfamily_regression_test",
     );
     assert.equal(config.APP_ENV, "test");

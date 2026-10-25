@@ -29,6 +29,7 @@ require __DIR__ . '/src/widgets.php';
 require __DIR__ . '/src/widget-decisions.php';
 require __DIR__ . '/src/sudoku-puzzles.php';
 require __DIR__ . '/src/sudoku.php';
+require __DIR__ . '/src/daily-word.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -56,6 +57,9 @@ if ($mount !== '' && $mount !== '.' && ($path === $mount || str_starts_with($pat
 }
 
 $routes = [
+    '/daily-word' => ['GET'], '/daily-word/results' => ['GET'],
+    '/daily-word/install' => ['POST'], '/daily-word/remove' => ['POST'],
+    '/daily-word/guess' => ['POST'], '/daily-word/share' => ['POST'], '/daily-word/withdraw' => ['POST'],
     '/sudoku' => ['GET'], '/sudoku/install' => ['POST'], '/sudoku/save' => ['POST'],
     '/sudoku/new' => ['POST'], '/sudoku/restart' => ['POST'], '/sudoku/remove' => ['POST'],
     '/widgets' => ['GET'], '/widgets/add' => ['POST'], '/widgets/edit' => ['POST'],
@@ -195,6 +199,11 @@ if ($path === '/week-context/towns') {
 if ($path === '/admin/activity') {
     $user = requireFamilyUser($db);
     jsonResponse(adminActivitySnapshot($db, $user, $_GET));
+    exit;
+}
+if ($path === '/daily-word' || str_starts_with($path, '/daily-word/')) {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/daily-word' ? dailyWordSnapshot($db, $user) : ($path === '/daily-word/results' ? dailyWordResults($db) : mutateDailyWord($db, $user, substr($path, strlen('/daily-word/')), requestJson())));
     exit;
 }
 if ($path === '/sudoku' || str_starts_with($path, '/sudoku/')) {

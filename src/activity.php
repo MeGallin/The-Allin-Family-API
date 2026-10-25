@@ -1,9 +1,11 @@
 <?php
 declare(strict_types=1);
 
-function sharedActivityTypes(): array
+function adminActivityTypes(): array
 {
-    return ['shopping_item', 'calendar_event', 'memory', 'poll', 'user_profile', 'user_account', 'widget'];
+    // Daily Word exposes lifecycle/publication metadata only to administrators.
+    // It is a separate entity so private installation events cannot change family widget ETags.
+    return ['shopping_item', 'calendar_event', 'memory', 'poll', 'user_profile', 'user_account', 'widget', 'daily_word'];
 }
 
 // Call inside the same transaction as the domain write. Actor identity comes only from the session.
