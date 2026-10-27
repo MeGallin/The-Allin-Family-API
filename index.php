@@ -31,6 +31,7 @@ require __DIR__ . '/src/sudoku-puzzles.php';
 require __DIR__ . '/src/sudoku.php';
 require __DIR__ . '/src/daily-word.php';
 require __DIR__ . '/src/focus-timer.php';
+require __DIR__ . '/src/household-jobs.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -58,6 +59,9 @@ if ($mount !== '' && $mount !== '.' && ($path === $mount || str_starts_with($pat
 }
 
 $routes = [
+ '/household-jobs'=>['GET'], '/household-jobs/add'=>['POST'], '/household-jobs/edit'=>['POST'],
+ '/household-jobs/claim'=>['POST'], '/household-jobs/assign'=>['POST'], '/household-jobs/complete'=>['POST'],
+ '/household-jobs/reopen'=>['POST'], '/household-jobs/remove'=>['POST'], '/household-jobs/reorder'=>['POST'],
     '/focus-timer' => ['GET'], '/focus-timer/install' => ['POST'], '/focus-timer/start' => ['POST'],
     '/focus-timer/pause' => ['POST'], '/focus-timer/resume' => ['POST'], '/focus-timer/finish' => ['POST'],
     '/focus-timer/reset' => ['POST'], '/focus-timer/next' => ['POST'], '/focus-timer/remove' => ['POST'],
@@ -204,6 +208,11 @@ if ($path === '/admin/activity') {
     $user = requireFamilyUser($db);
     jsonResponse(adminActivitySnapshot($db, $user, $_GET));
     exit;
+}
+if ($path === '/household-jobs' || str_starts_with($path, '/household-jobs/')) {
+ $user = requireFamilyUser($db);
+ if ($path !== '/household-jobs') mutateHouseholdJob($db,$user,substr($path,strlen('/household-jobs/')),requestJson());
+ jsonResponse(householdJobsSnapshot($db,$user)); exit;
 }
 if ($path === '/focus-timer' || str_starts_with($path, '/focus-timer/')) {
     $user = requireFamilyUser($db);

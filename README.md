@@ -1113,3 +1113,33 @@ parent live owner-browser QA passed with no family-content writes or console
 warnings/errors. Existing Focus remains installed Ready25:00. Private evidence
 `.local/production-releases/20261025-uiux/`; workspace release handoff records the
 full acceptance. This documentation-only follow-up needs no runtime rebuild/upload.
+
+## Household Jobs — local implementation, 27 October 2026
+
+Additive migration025 adds `household_jobs`, `household_job_history`,
+`household_job_receipts` and `household_job_order`. It was applied only to the
+isolated local database with `C:/xampp/php/php.exe bin/migrate.php --local`.
+No production migration/data import or release action is included.
+
+Authenticated GET `/household-jobs` returns family jobs plus only the caller's
+private Mine jobs, retained archived jobs/history and active assignee choices.
+POST `/household-jobs/{add,edit,claim,assign,complete,reopen,remove,reorder}` uses
+CSRF, UUID request keys and exact item versions except add/reorder. Ownership
+comes from session. Creator/admin manages shared details/assignment/removal;
+any member may claim unassigned work; creator/admin/assignee may complete/reopen.
+Private jobs have no admin bypass and never enter generic activity/reporting.
+
+Target days are optional planning hints, never overdue. Weekly/monthly completes
+retain an occurrence and advance the target (monthly clamps); flexible repeats
+remain flexible. Reopen restores the most recent un-reopened occurrence's target.
+Soft deletion stops repeats and preserves domain history. Shared family order is
+one complete collection, serialised with membership writes; latest successful new
+save wins. Old accepted request retries acknowledge without replaying old order.
+Per-item CAS prevents concurrent stale edits/claims/completions. All domain writes
+and receipts commit together; controller reads a fresh snapshot after acceptance.
+
+Run `node --test tests/household-jobs.test.mjs` for the owned disposable local
+fixture suite, including separate-process claims/orders. Cleanup verifies removal
+of disposable database/account/session/photo fixture resources. Client contract
+and parent browser matrix are in client `docs/household-jobs.md`; source review,
+visual acceptance and production release remain distinct gates.
