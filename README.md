@@ -8,6 +8,33 @@ limitations are documented in [ROUTINE-BACKUPS.md](ROUTINE-BACKUPS.md).
 PHP and MySQL API for the separate React client. Account creation and password
 resets are administrator CLI actions. There is no public registration endpoint.
 
+## App release label
+
+`../client/src/app-version.json` is the single canonical app release source.
+It starts at string `0.1`; subsequent release labels are `0.15`,
+`0.20`, `0.25`, increasing by exactly 0.05 with trailing zeroes retained. These
+are release labels, separate from package semantic versions. Public read-only
+`GET /version` returns only `{ "version": "0.1" }` with no-store headers, before
+session/database creation; existing maintenance protection still applies. In
+production it reads generated `api/release.json`; only `APP_ENV=local` reads the
+sibling client source. Missing/invalid production metadata fails closed with a
+generic server error instead of guessing a version.
+
+Before committing/packaging each authorized production release, set its target
+once from the sibling client: `npm run release:version -- 0.15`. The command accepts
+the same target again without writing or exactly the next label. Builds never
+increment. Even an API-only release requires an approved metadata commit in the
+client repository; no client build/upload is needed for it. A client-only release
+requires no API metadata commit/upload. Keep both approved checkout revisions
+together for packaging. API/full packaging copies the client source JSON into
+generated `api/release.json` without changing this repository; upload it after
+dependencies and before `api/index.php`.
+The first feature release must install both API endpoint and client footer at `0.1`.
+Later API-only uploads advance an installed footer on its next bounded version
+read; client-only builds use their bundled label if the live API label is older.
+This describes a latest known global release, not FileZilla completion or byte-level
+client/API parity. See the client README release procedure. No database migration.
+
 ## Focus Timer — released 25 October 2026
 
 Migration 024_focus_timer.sql adds three private domains: owner installation/defaults/

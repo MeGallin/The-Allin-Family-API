@@ -60,6 +60,7 @@ if ($mount !== '' && $mount !== '.' && ($path === $mount || str_starts_with($pat
 }
 
 $routes = [
+    '/version' => ['GET'],
     '/home-recap' => ['GET'], '/home-recap/review' => ['POST'],
  '/household-jobs'=>['GET'], '/household-jobs/add'=>['POST'], '/household-jobs/edit'=>['POST'],
  '/household-jobs/claim'=>['POST'], '/household-jobs/assign'=>['POST'], '/household-jobs/complete'=>['POST'],
@@ -105,6 +106,18 @@ if (!isset($routes[$path])) throw new HttpError(404, 'Not found.');
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', $routes[$path], true)) {
     header('Allow: ' . implode(', ', $routes[$path]));
     throw new HttpError(405, 'Method not allowed.');
+}
+if ($path === '/version') {
+    $releasePath = $configuration['APP_ENV'] === 'local'
+        ? dirname(__DIR__) . '/client/src/app-version.json'
+        : __DIR__ . '/release.json';
+    $release = json_decode(file_get_contents($releasePath), true, 512, JSON_THROW_ON_ERROR);
+    if (!is_array($release) || !is_string($release['version'] ?? null)
+        || !preg_match('/^(0|[1-9]\d*)\.\d{1,2}$/D', $release['version'])) {
+        throw new RuntimeException('Invalid app release version.');
+    }
+    jsonResponse(['version' => $release['version']]);
+    exit;
 }
 if ($path === '/health') {
     jsonResponse(['status' => 'ok', 'service' => $configuration['APP_NAME']]);
