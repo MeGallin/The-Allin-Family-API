@@ -11,6 +11,11 @@ function adminActivityTypes(): array
 // Call inside the same transaction as the domain write. Actor identity comes only from the session.
 function recordActivity(PDO $db, array $user, string $entityType, int $entityId, string $action, ?array $before, ?array $after): void
 {
+    if (in_array($entityType, ['calendar_event', 'shopping_item'], true)) {
+        // Lock BEFORE allocating the audit ID, held until the domain transaction commits.
+        // Otherwise a lower, still-uncommitted ID could be lost behind a reviewed cursor.
+        $db->query('SELECT id FROM home_recap_clock WHERE id = 1 FOR UPDATE')->fetch();
+    }
     $statement = $db->prepare('INSERT INTO activity_events
         (entity_type, entity_id, action, actor_id, actor_name, occurred_at, before_data, after_data)
         VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6), ?, ?)');

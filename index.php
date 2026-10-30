@@ -8,6 +8,7 @@ require __DIR__ . '/src/database.php';
 require __DIR__ . '/src/release-maintenance.php';
 require __DIR__ . '/src/auth.php';
 require __DIR__ . '/src/activity.php';
+require __DIR__ . '/src/home-recap.php';
 require __DIR__ . '/src/snapshot-response.php';
 require __DIR__ . '/src/shopping.php';
 require __DIR__ . '/src/profiles.php';
@@ -59,6 +60,7 @@ if ($mount !== '' && $mount !== '.' && ($path === $mount || str_starts_with($pat
 }
 
 $routes = [
+    '/home-recap' => ['GET'], '/home-recap/review' => ['POST'],
  '/household-jobs'=>['GET'], '/household-jobs/add'=>['POST'], '/household-jobs/edit'=>['POST'],
  '/household-jobs/claim'=>['POST'], '/household-jobs/assign'=>['POST'], '/household-jobs/complete'=>['POST'],
  '/household-jobs/reopen'=>['POST'], '/household-jobs/remove'=>['POST'], '/household-jobs/reorder'=>['POST'],
@@ -204,6 +206,12 @@ if ($path === '/week-context/towns') {
     jsonResponse(weekTownSearch($configuration, $user, $term));
     exit;
 }
+if ($path === '/home-recap' || $path === '/home-recap/review') {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/home-recap' ? homeRecapSnapshot($db, $user) : reviewHomeRecap($db, $user, requestJson()));
+    exit;
+}
+
 if ($path === '/admin/activity') {
     $user = requireFamilyUser($db);
     jsonResponse(adminActivitySnapshot($db, $user, $_GET));

@@ -1143,3 +1143,28 @@ fixture suite, including separate-process claims/orders. Cleanup verifies remova
 of disposable database/account/session/photo fixture resources. Client contract
 and parent browser matrix are in client `docs/household-jobs.md`; source review,
 visual acceptance and production release remain distinct gates.
+
+## Home recap — local implementation, 30 October 2026
+
+Authenticated GET `/home-recap` projects only other-family-member calendar and
+shopping changes from existing transactional `activity_events`. It returns the
+latest change per record with whitelisted title/type/actor/time/source identifiers;
+no calendar notes, raw audit JSON, personal notes or other widgets are included.
+First use starts at the current boundary without a historic backlog. CSRF-protected
+POST `/home-recap/review` advances only the caller's cursor through its offered
+snapshot, monotonically and retry-safely; newer events remain unread.
+
+Migration `026_home_recap.sql` adds a singleton audit-allocation lock and per-user
+reviewed/offered cursors. Eligible audit inserts take that lock before allocating
+an ID and retain it through the source transaction's commit. The snapshot takes
+the same lock before reading its boundary, preventing a late lower ID from being
+lost. No duplicate event log or audit backfill. Apply 026 before deploying the API,
+then deploy the matching client. Production migration needs separate approval and
+the established verified backup/rehearsal process.
+
+026 was applied only to the guarded local database (local/127.0.0.1:3307), after a
+private full SQL backup. Existing non-ledger table fingerprints were preserved;
+new clock row=1 and reviews=0 immediately afterwards. PHP syntax and client build
+passed; no tests were added/run. Functional and parent browser acceptance remain
+pending. See client `docs/home-recap.md` and workspace
+`reports/cody/2026-10-30-since-last-visit.md`. No commit, push or deployment.
