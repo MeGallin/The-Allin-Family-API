@@ -14,8 +14,13 @@ function familySnapshotResponse(PDO $db, array $user, string $domain, callable $
     $revision = (string)$query->fetchColumn();
     // Nickname/account edits affect projected author names and visible permissions.
     $profiles = $db->query('SELECT COUNT(*) AS people,COALESCE(SUM(profile_version),0) AS revision FROM users')->fetch();
-    $representation = $domain === 'widget' ? ':meals-v3:' . (new DateTimeImmutable('today',new DateTimeZone('Europe/London')))->format('Y-m-d') : '';
-    $etag = '"' . hash('sha256', 'snapshot-v1:' . $domain . ':' . $user['id'] . ':' . $revision . ':' . $profiles['people'] . ':' . $profiles['revision'] . $representation) . '"';
+    $itemRevision = '';
+    if ($domain === 'widget') {
+        $items = $db->prepare("SELECT COALESCE(SUM(i.version),0) FROM where_is_it_items i JOIN family_widgets w ON w.id=i.widget_id WHERE w.owner_id=? OR w.visibility='family'");
+        $items->execute([$user['id']]); $itemRevision = ':' . $items->fetchColumn();
+    }
+    $representation = $domain === 'widget' ? ':meals-v3:where-summary-v2:' . (new DateTimeImmutable('today',new DateTimeZone('Europe/London')))->format('Y-m-d') : '';
+    $etag = '"' . hash('sha256', 'snapshot-v1:' . $domain . ':' . $user['id'] . ':' . $revision . ':' . $profiles['people'] . ':' . $profiles['revision'] . $representation . $itemRevision) . '"';
     header('ETag: ' . $etag);
     header('Cache-Control: no-store');
     if (trim($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {

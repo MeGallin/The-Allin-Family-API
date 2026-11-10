@@ -92,9 +92,11 @@ function widgetsSnapshot(PDO $db, array $user): array
         $publications=widgetPublicationsSnapshot($db,array_column($rows,'id'));
         $widgets = [];
         foreach ($rows as $row) {
+            $itemSummary = $row['kind'] === 'where-is-it' ? whereItemSummary($db,(string)$row['id']) : ['itemCount'=>0,'latestItemUpdatedAt'=>null];
             $widgets[] = ['id' => (string)$row['id'], 'kind' => $row['kind'], 'title' => $row['title'], 'visibility' => $row['visibility'],
                 'owner' => ['id' => (int)$row['owner_id'], 'name' => familyDisplayName($row)], 'version' => (int)$row['version'],
                 'hidden' => $row['hidden_by'] !== null, 'createdAt' => activityTimestamp($row['created_at']), 'updatedAt' => activityTimestamp($row['updated_at']),
+                'itemCount' => $itemSummary['itemCount'], 'latestItemUpdatedAt' => $itemSummary['latestItemUpdatedAt'],
                 'meals' => $mealRows[$row['id']] ?? [], 'spins' => $spinRows[$row['id']] ?? [], 'publications'=>$publications[$row['id']]??[]];
         }
         $db->commit();
@@ -104,6 +106,12 @@ function widgetsSnapshot(PDO $db, array $user): array
 
 function mutateWidget(PDO $db, array $user, string $operation, array $body): array
 {
+    if (($body['kind'] ?? null) === 'where-is-it' && $operation === 'add') return mutateWhereInstallation($db,$user,$operation,$body);
+    if ($operation !== 'add') {
+        $kind = $db->prepare('SELECT kind FROM family_widgets WHERE id=?');
+        $kind->execute([widgetIdentifier($body['id'] ?? null)]);
+        if ($kind->fetchColumn() === 'where-is-it') return mutateWhereInstallation($db,$user,$operation,$body);
+    }
     if (in_array($operation,['publish','respond','eaten'],true)) return mutateWidgetDecision($db,$user,$operation,$body);
     $draft = in_array($operation, ['add', 'edit'], true) ? widgetDraft($body) : null;
     if ($draft) {
@@ -204,4 +212,11 @@ function mutateWidget(PDO $db, array $user, string $operation, array $body): arr
         $db->commit();
     } catch (Throwable $error) { $db->rollBack(); throw $error; }
     return widgetsSnapshot($db,$user)+['selectedSpin'=>$selected];
+}
+
+function whereItemSummary(PDO $db, string $id): array
+{
+    $query=$db->prepare('SELECT COUNT(*) AS item_count,MAX(updated_at) AS latest_update FROM where_is_it_items WHERE widget_id=? AND deleted_at IS NULL');
+    $query->execute([$id]); $row=$query->fetch();
+    return ['itemCount'=>(int)$row['item_count'], 'latestItemUpdatedAt'=>$row['latest_update'] === null ? null : activityTimestamp($row['latest_update'])];
 }

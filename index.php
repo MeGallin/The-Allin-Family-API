@@ -27,6 +27,7 @@ require __DIR__ . '/src/food-alerts.php';
 require __DIR__ . '/src/weather-warnings.php';
 require __DIR__ . '/src/travel.php';
 require __DIR__ . '/src/widgets.php';
+require __DIR__ . '/src/where-is-it.php';
 require __DIR__ . '/src/widget-decisions.php';
 require __DIR__ . '/src/sudoku-puzzles.php';
 require __DIR__ . '/src/sudoku.php';
@@ -73,6 +74,8 @@ $routes = [
     '/daily-word/guess' => ['POST'], '/daily-word/share' => ['POST'], '/daily-word/withdraw' => ['POST'],
     '/sudoku' => ['GET'], '/sudoku/install' => ['POST'], '/sudoku/save' => ['POST'],
     '/sudoku/new' => ['POST'], '/sudoku/restart' => ['POST'], '/sudoku/remove' => ['POST'],
+    '/where-is-it' => ['GET'], '/where-is-it/photo' => ['GET'],
+    '/where-is-it/add' => ['POST'], '/where-is-it/edit' => ['POST'], '/where-is-it/remove' => ['POST'],
     '/widgets' => ['GET'], '/widgets/add' => ['POST'], '/widgets/edit' => ['POST'],
     '/widgets/spin' => ['POST'], '/widgets/remove' => ['POST'], '/widgets/remove-meal' => ['POST'], '/widgets/hide' => ['POST'],
     '/widgets/publish' => ['POST'], '/widgets/respond' => ['POST'], '/widgets/eaten' => ['POST'],
@@ -251,6 +254,13 @@ if ($path === '/sudoku' || str_starts_with($path, '/sudoku/')) {
     exit;
 }
 
+if ($path === '/where-is-it' || str_starts_with($path, '/where-is-it/')) {
+    $user = requireFamilyUser($db);
+    if ($path === '/where-is-it/photo') serveWherePhoto($db,$configuration,$user);
+    elseif ($path === '/where-is-it') jsonResponse(whereSnapshot($db,$user));
+    else jsonResponse(mutateWhereItem($db,$configuration,$user,substr($path,strlen('/where-is-it/')),str_starts_with(strtolower($_SERVER['CONTENT_TYPE'] ?? ''),'multipart/form-data;') ? memoryRequest() : requestJson()));
+    exit;
+}
 if ($path === '/widgets' || str_starts_with($path, '/widgets/')) {
     $user = requireFamilyUser($db);
     if ($path === '/widgets') familySnapshotResponse($db, $user, 'widget', fn() => widgetsSnapshot($db, $user));
