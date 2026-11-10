@@ -1205,3 +1205,29 @@ Authenticated GET /where-is-it returns only accessible active items. CSRF-protec
 Item and installation receipts retain exact payload signatures and stable acknowledgements across later writes. Current snapshots accompany replay acknowledgements. Owner and collection locks serialize receipt reuse, installation limits and CAS writes. Item mutation text/photos never enter activity audit payloads; installation audit uses kind/owner/visibility/version only. Visible item revisions participate in widget ETags so metadata-only Home projections refresh correctly. Where collection metadata contains itemCount plus latestItemUpdatedAt from COUNT/MAX(updated_at) over active items only, with null recency when empty. No item text or photo data is added. The representation suffix is advanced for this metadata shape; existing access filtering is unchanged. Removed photos follow soft-delete retention; replaced keys are cleaned only after a confirmed commit, and uncertain COMMITs preserve new files.
 
 Migration027 was applied only to guarded local127.0.0.1:3307. During implementation its final third receipt table was added with only its CREATE TABLE statement after initial local027 application; the final uncommitted migration contains all three tables for fresh installations. No old-table ALTER, data import or replacement. Run node --test tests/where-is-it.test.mjs for the scoped owned-disposable DB/account/session/photo suite (including true parallel edit/receipt races). No production migration, version change, build, commit, push or upload was performed. See client docs/where-is-it.md for UI/recovery limits.
+
+## Nonograms — local implementation, 10 November 2026
+
+Authenticated owner-private GET `/nonograms` and CSRF-protected POST
+`/nonograms/{install,save,new,restart,remove}` store one active picture puzzle and
+finite played IDs per account. Migration `028_nonograms.sql` adds only
+`user_nonograms` and immutable `nonogram_receipts`; no existing rows are modified.
+It is applied to the isolated local application database only. The first attempted
+creation failed before either table existed because the new owner FK type was
+incorrect; the migration now correctly matches existing BIGINT UNSIGNED user IDs.
+No database repair or existing-data replacement occurred.
+
+Owner transaction locks, exact immutable request receipts and monotonic revision/
+active-puzzle guards cover lost responses, stale saves, reset, removal and reinstall.
+No family/cache/activity/audit content is emitted. An admin has no target-owner read
+or write bypass. Six original patterns (three per size) expose computed clues; the
+focused suite independently proves unique solutions and complete line-deduction
+solvability without guessing. No difficulty, timer or unlimited-new-puzzle claim.
+
+Run `node --test tests/nonograms.test.mjs` for the isolated synthetic owner/member/
+admin API checks and all six proofs. The existing disposable Sudoku-named harness
+is reused for database/account/session creation and verified cleanup only; this
+suite does not access real family puzzles. Client `docs/nonograms.md` documents
+autosave and explicit uncertainty/conflict recovery. Production migration requires
+its separate authorized backup/restore safeguards. No commit, release build, push,
+upload or production action has occurred.

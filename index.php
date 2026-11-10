@@ -31,6 +31,7 @@ require __DIR__ . '/src/where-is-it.php';
 require __DIR__ . '/src/widget-decisions.php';
 require __DIR__ . '/src/sudoku-puzzles.php';
 require __DIR__ . '/src/sudoku.php';
+require __DIR__ . '/src/nonograms.php';
 require __DIR__ . '/src/daily-word.php';
 require __DIR__ . '/src/focus-timer.php';
 require __DIR__ . '/src/household-jobs.php';
@@ -72,6 +73,8 @@ $routes = [
     '/daily-word' => ['GET'], '/daily-word/results' => ['GET'],
     '/daily-word/install' => ['POST'], '/daily-word/remove' => ['POST'],
     '/daily-word/guess' => ['POST'], '/daily-word/share' => ['POST'], '/daily-word/withdraw' => ['POST'],
+    '/nonograms' => ['GET'], '/nonograms/install' => ['POST'], '/nonograms/save' => ['POST'],
+    '/nonograms/new' => ['POST'], '/nonograms/restart' => ['POST'], '/nonograms/remove' => ['POST'],
     '/sudoku' => ['GET'], '/sudoku/install' => ['POST'], '/sudoku/save' => ['POST'],
     '/sudoku/new' => ['POST'], '/sudoku/restart' => ['POST'], '/sudoku/remove' => ['POST'],
     '/where-is-it' => ['GET'], '/where-is-it/photo' => ['GET'],
@@ -246,6 +249,11 @@ if ($path === '/focus-timer' || str_starts_with($path, '/focus-timer/')) {
 if ($path === '/daily-word' || str_starts_with($path, '/daily-word/')) {
     $user = requireFamilyUser($db);
     jsonResponse($path === '/daily-word' ? dailyWordSnapshot($db, $user) : ($path === '/daily-word/results' ? dailyWordResults($db) : mutateDailyWord($db, $user, substr($path, strlen('/daily-word/')), requestJson())));
+    exit;
+}
+if ($path === '/nonograms' || str_starts_with($path, '/nonograms/')) {
+    $user = requireFamilyUser($db);
+    jsonResponse($path === '/nonograms' ? nonogramSnapshot($db, $user) : mutateNonogram($db, $user, substr($path, strlen('/nonograms/')), requestJson()));
     exit;
 }
 if ($path === '/sudoku' || str_starts_with($path, '/sudoku/')) {
