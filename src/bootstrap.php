@@ -28,6 +28,9 @@ function loadConfiguration(string $path): array
         'DATABASE_RELEASE_DIRECTORY' => '',
         'MEMORY_PHOTO_DIRECTORY' => dirname(__DIR__) . '/.local/memory-photos',
         'WEEK_CONTEXT_DIRECTORY' => '',
+        'ADVERTISING_DIRECTORY' => '',
+        'ADVERTISING_NODE_URL' => 'http://127.0.0.2:8000',
+        'ADVERTISING_SIGNING_SECRET' => '',
     ];
 
     foreach ($defaults as $key => $default) {

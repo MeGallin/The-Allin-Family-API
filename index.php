@@ -35,6 +35,7 @@ require __DIR__ . '/src/nonograms.php';
 require __DIR__ . '/src/daily-word.php';
 require __DIR__ . '/src/focus-timer.php';
 require __DIR__ . '/src/household-jobs.php';
+require __DIR__ . '/src/advertising.php';
 
 set_exception_handler(static function (Throwable $error): void {
     if ($error instanceof HttpError) {
@@ -62,6 +63,9 @@ if ($mount !== '' && $mount !== '.' && ($path === $mount || str_starts_with($pat
 }
 
 $routes = [
+    '/advertising' => ['GET'], '/advertising/image' => ['GET'], '/advertising/machine' => ['POST'], '/advertising/machine/image' => ['POST'],
+    '/admin/advertising' => ['GET'], '/admin/advertising/action' => ['POST'],
+    '/admin/advertising/export' => ['GET'], '/admin/advertising/status' => ['GET'],
     '/version' => ['GET'],
     '/home-recap' => ['GET'], '/home-recap/review' => ['POST'],
  '/household-jobs'=>['GET'], '/household-jobs/add'=>['POST'], '/household-jobs/edit'=>['POST'],
@@ -129,6 +133,12 @@ if ($path === '/health') {
     jsonResponse(['status' => 'ok', 'service' => $configuration['APP_NAME']]);
     exit;
 }
+if ($path === '/advertising/machine' || $path === '/advertising/machine/image') {
+    if (isset($_SERVER['HTTP_ORIGIN'])) throw new HttpError(403, 'Browser access is not permitted.');
+    if (str_contains($_SERVER['REQUEST_URI'] ?? '', '?')) throw new HttpError(400, 'Machine paths do not accept query parameters.');
+    advertDispatchMachine($configuration, $path);
+    exit;
+}
 
 $db = null;
 try {
@@ -140,6 +150,29 @@ try {
 }
 startFamilySession($configuration, $db);
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') requireCsrf($configuration);
+if ($path === '/advertising' || $path === '/advertising/image' || str_starts_with($path, '/admin/advertising')) {
+    if (isset($_SERVER['HTTP_ORIGIN']) && $_SERVER['HTTP_ORIGIN'] !== rtrim($configuration['APP_ORIGIN'], '/')) throw new HttpError(403, 'The request origin is not permitted.');
+    $actor = requireFamilyUser($db);
+    if ($path !== '/advertising' && $path !== '/advertising/image') requireFamilyAdmin($actor);
+    $body = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ? json_decode(json_encode(requestJson(65536), JSON_THROW_ON_ERROR), true, 24, JSON_THROW_ON_ERROR) : [];
+    session_write_close();
+    if ($path === '/advertising/image') advertServeImage($configuration, is_string($_GET['id'] ?? null) ? $_GET['id'] : '', $actor['role'] === 'admin');
+    elseif ($path === '/advertising') jsonResponse(advertPublicSnapshot($configuration));
+    elseif ($path === '/admin/advertising/action') {
+        advertAdminAction($configuration, $body, null, (int)$actor['id']);
+        if (($body['action'] ?? '') === 'prepare') advertRunJob($configuration, true);
+        jsonResponse(advertGetAdmin($configuration));
+    } elseif ($path === '/admin/advertising/status') {
+        $status = advertNodeRequest($configuration, '/v1/status', [], 8);
+        jsonResponse(['credentials' => ['providerConfigured' => ($status['providerConfigured'] ?? false) === true,
+            'engineAvailable' => ($status['ok'] ?? false) === true]]);
+    } elseif ($path === '/admin/advertising/export') {
+        $snapshot = advertGetAdmin($configuration);
+        header('Content-Disposition: attachment; filename="advertising-settings.json"');
+        jsonResponse(['schema' => 1, 'configRevision' => $snapshot['configRevision'], 'config' => $snapshot['config'], 'draft' => $snapshot['draft'], 'exportedAt' => gmdate(DATE_ATOM)]);
+    } else jsonResponse(advertGetAdmin($configuration));
+    exit;
+}
 if ($path === '/auth/logout') {
     $logoutBody = requestJson();
     if ($db !== null) {

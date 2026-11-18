@@ -1,5 +1,10 @@
 # The Allin Family - API
 
+Feature advertising uses the existing administrator account, private atomic JSON
+state and a signed stateless Node engine. It starts disabled with zero budgets;
+no database migration or additional paid infrastructure is needed. See
+[advertising operations](docs/advertising.md) for setup, safety boundaries and tests.
+
 Encrypted nightly database/photo backups and the signed-in laptop OneDrive
 collector are active. A real isolated restore passed 15 tables and 12 photo files
 without replacing live data. Exact installation, schedules, recovery steps and
